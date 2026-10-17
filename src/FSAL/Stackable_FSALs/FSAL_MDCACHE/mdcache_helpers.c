@@ -3251,6 +3251,20 @@ again:
 			status = mdc_lookup_uncached(directory, dirent->name,
 						     &entry, NULL);
 
+			if (status.major == ERR_FSAL_NOENT) {
+				/* Removed outside of Ganesha since it was
+				 * cached. Drop the dirent and carry on, as for
+				 * a stale entry below; we hold the write lock.
+				 */
+				LogFullDebugAlt(
+					COMPONENT_NFS_READDIR,
+					COMPONENT_MDCACHE,
+					"Dropping dirent %s, no longer exists",
+					dirent->name);
+				avl_dirent_set_deleted(directory, dirent);
+				continue;
+			}
+
 			if (FSAL_IS_ERROR(status)) {
 				mdcache_lru_unref_chunk(chunk);
 
