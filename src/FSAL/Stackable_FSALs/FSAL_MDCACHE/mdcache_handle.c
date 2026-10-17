@@ -551,6 +551,9 @@ static fsal_status_t mdcache_link(struct fsal_obj_handle *obj_hdl,
  *
  * @return FSAL status
  */
+static fsal_status_t mdcache_getattrs(struct fsal_obj_handle *obj_hdl,
+				      struct fsal_attrlist *attrs_out);
+
 static fsal_status_t mdcache_readdir(struct fsal_obj_handle *dir_hdl,
 				     fsal_cookie_t *whence, void *dir_state,
 				     fsal_readdir_cb cb, attrmask_t attrmask,
@@ -562,6 +565,21 @@ static fsal_status_t mdcache_readdir(struct fsal_obj_handle *dir_hdl,
 
 	if (!(directory->obj_handle.type == DIRECTORY))
 		return fsalstat(ERR_FSAL_NOTDIR, 0);
+
+	if (dirmode != FSAL_RDDIR_CHUNK_NEVER) {
+		struct fsal_attrlist attrs;
+
+		/* Revalidate the directory before serving cached dirents, as
+		 * GETATTR does. Otherwise, unless a GETATTR of the directory
+		 * came first, READDIR lists entries removed outside Ganesha.
+		 * This refreshes only if the attributes have expired, and
+		 * flushes the dirents if the directory changed.
+		 */
+		fsal_prepare_attrs(&attrs,
+				   ATTR_MTIME | ATTR_CHANGE | ATTR_RDATTR_ERR);
+		(void)mdcache_getattrs(dir_hdl, &attrs);
+		fsal_release_attrs(&attrs);
+	}
 
 	if (dirmode == FSAL_RDDIR_CHUNK_NEVER) {
 		/* Not caching dirents; pass through directly to FSAL */
@@ -1501,13 +1519,33 @@ invoke_subfsal:
 	/* Check if is_referral added any new attrs and update them in the
 	 * cache */
 	if (!mdcache_is_attrs_valid(entry, attrs->request_mask)) {
+		struct timespec oldmtime;
+
 		if (!write_locked) {
 			/* Promote to write lock to update the cached attrs */
 			PTHREAD_RWLOCK_unlock(&entry->attr_lock);
 			PTHREAD_RWLOCK_wrlock(&entry->attr_lock);
 		}
 
+		oldmtime = entry->attrs.mtime;
+
 		mdc_update_attr_cache(entry, attrs);
+
+		/* This refresh bypasses mdcache_refresh_attrs(), so do its
+		 * check for a directory changed outside of Ganesha here: else
+		 * the new mtime is taken and the dirents are never flushed.
+		 */
+		if (entry->obj_handle.type == DIRECTORY &&
+		    FSAL_TEST_MASK(entry->attrs.valid_mask, ATTR_MTIME) &&
+		    gsh_time_cmp(&oldmtime, &entry->attrs.mtime) != 0) {
+			LogFullDebug(
+				COMPONENT_MDCACHE,
+				"Entry %p changed, clearing MDCACHE_TRUST_CONTENT, MDCACHE_DIR_POPULATED",
+				entry);
+			atomic_clear_uint32_t_bits(
+				&entry->mde_flags,
+				MDCACHE_TRUST_CONTENT | MDCACHE_DIR_POPULATED);
+		}
 	}
 
 	assert(locked);
