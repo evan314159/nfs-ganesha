@@ -528,7 +528,8 @@ typedef struct nfs_core_param {
 	    environment where users are part of large number of groups.
 	*/
 	uint32_t max_uid_to_grp_reqs;
-	/** Enable v3 filehandle to be used for v4 */
+	/** No longer used: NFSv4 handles are always padded to a multiple of
+	    4 bytes, and unpadded ones are always accepted. */
 	bool enable_v3_fh_for_v4;
 	/** Readdir response size, default is 64M (limited by maxcount from
 	*  nfs request. range 4K-64M

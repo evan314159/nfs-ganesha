@@ -253,7 +253,8 @@ Max_Uid_To_Group_Reqs(uint32, range 0 to INT32_MAX, default 0)
     that ganesha makes.
 
 Enable_V3fh_Validation_For_V4(bool, default false)
-    Set true to enforce when v3 file handle used for v4
+    No longer has any effect: NFSv4 handles are always padded to a multiple
+    of 4 bytes, and unpadded ones are always accepted.
 
 Readdir_Res_Size(uint32, range 4096 to 64*1024*1024, default 32*1024)
     Response size of readdir request.

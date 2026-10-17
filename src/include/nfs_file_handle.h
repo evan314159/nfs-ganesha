@@ -138,13 +138,11 @@ static inline size_t nfs4_sizeof_handle_padding(struct file_handle_v4 *hdl)
 
 static inline bool valid_Fh4_Len(nfs_fh4 *fh, file_handle_v4_t *pfile_handle)
 {
-	if (!nfs_param.core_param.enable_v3_fh_for_v4) {
-		return fh->nfs_fh4_len == nfs4_sizeof_handle(pfile_handle);
-	} else {
-		return ((fh->nfs_fh4_len == nfs4_sizeof_handle(pfile_handle)) ||
-			(fh->nfs_fh4_len ==
-			 nfs4_sizeof_handle_padding(pfile_handle)));
-	}
+	/* Handles are sent padded, but unpadded ones issued by earlier
+	 * versions are still valid.
+	 */
+	return ((fh->nfs_fh4_len == nfs4_sizeof_handle(pfile_handle)) ||
+		(fh->nfs_fh4_len == nfs4_sizeof_handle_padding(pfile_handle)));
 }
 
 #define LEN_FH_STR OPAQUE_BYTES_SIZE(NFS4_FHSIZE)

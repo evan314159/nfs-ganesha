@@ -161,8 +161,10 @@ bool nfs4_FSALToFhandle(bool allocate, nfs_fh4 *fh4,
 	/* keep track of the export id network byte order for nfs_fh4*/
 	file_handle->id.exports = htons(exp->export_id);
 
-	/* Set the len */
-	fh4->nfs_fh4_len = nfs4_sizeof_handle(file_handle);
+	/* Pad the length to a multiple of 4. The macOS client needs this to
+	 * mount a filesystem nested inside one it has already automounted.
+	 */
+	fh4->nfs_fh4_len = nfs4_sizeof_handle_padding(file_handle);
 
 	LogFullDebugOpaque(COMPONENT_FILEHANDLE, "NFS4 Handle %s", LEN_FH_STR,
 			   fh4->nfs_fh4_val, fh4->nfs_fh4_len);
@@ -312,10 +314,9 @@ int nfs4_Is_Fh_Invalid(nfs_fh4 *fh)
 				LogInfo(COMPONENT_FILEHANDLE,
 					"INVALID HANDLE: data.data_len=%d is greater than %d",
 					fh->nfs_fh4_len, (int)NFS4_FHSIZE);
-			} else if (fh->nfs_fh4_len !=
-				   nfs4_sizeof_handle(pfile_handle)) {
+			} else if (!valid_Fh4_Len(fh, pfile_handle)) {
 				LogInfo(COMPONENT_FILEHANDLE,
-					"INVALID HANDLE: nfs_fh4_len=%d, should be %d",
+					"INVALID HANDLE: nfs_fh4_len=%d, should be %d, or that padded to a multiple of 4",
 					fh->nfs_fh4_len,
 					(int)nfs4_sizeof_handle(pfile_handle));
 			} else {
