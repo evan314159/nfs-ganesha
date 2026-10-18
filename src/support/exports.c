@@ -2516,6 +2516,10 @@ static struct config_item client_params[] = {
 	CONF_ITEM_BOOL("macOS_quirk_named_attr_NVERIFY", false,
 		       exportlist_client_entry,
 		       client_perms.macos_quirks.named_attr_nverify),
+	/* @todo Remove once macOS is fixed. */
+	CONF_ITEM_BOOL("macOS_quirk_named_attr_truncate", false,
+		       exportlist_client_entry,
+		       client_perms.macos_quirks.named_attr_truncate),
 #endif
 	/* NOTE: it may look odd that this uses (base_client_entry, cle_list)
 	 *       where other uses of add_client use the gsh_list the clients
