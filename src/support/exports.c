@@ -2511,6 +2511,12 @@ static struct config_item client_params[] = {
 	CONF_ITEM_TOKEN("HA_Proxy_Protocol", CLIENT_ENTRY_HA_PROXY_PROTOCOL_ANY,
 			export_client_ha_proxy_protocol,
 			exportlist_client_entry, ha_proxy_protocol_type),
+#ifdef USE_MACOS_QUIRKS
+	/* @todo Remove once macOS is fixed. */
+	CONF_ITEM_BOOL("macOS_quirk_named_attr_NVERIFY", false,
+		       exportlist_client_entry,
+		       client_perms.macos_quirks.named_attr_nverify),
+#endif
 	/* NOTE: it may look odd that this uses (base_client_entry, cle_list)
 	 *       where other uses of add_client use the gsh_list the clients
 	 *       are collected into. This is because the CLIENT blocks allocate
@@ -4095,6 +4101,15 @@ void export_check_access(void)
 				expclient->client_perms.anonymous_gid;
 
 		op_ctx->export_perms.set = expclient->client_perms.set;
+
+#ifdef USE_MACOS_QUIRKS
+		/* The macOS quirks are only set in CLIENT blocks.
+		 *
+		 * @todo Remove with the last macOS quirk.
+		 */
+		op_ctx->export_perms.macos_quirks =
+			expclient->client_perms.macos_quirks;
+#endif
 	}
 
 	/* Any options not set by the client, take from the export */

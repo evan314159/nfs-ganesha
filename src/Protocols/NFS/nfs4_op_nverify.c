@@ -81,6 +81,22 @@ enum nfs_req_result nfs4_op_nverify(struct nfs_argop4 *op,
 	if (res_NVERIFY4->status != NFS4_OK)
 		return NFS_REQ_ERROR;
 
+#ifdef USE_MACOS_QUIRKS
+	/* Work around a macOS client bug: its only NVERIFY comes before a READ
+	 * that prefetches a named attribute, and handling the prefetched data
+	 * can panic the client. Failing the NVERIFY stops the READ; the client
+	 * then reads the value normally.
+	 *
+	 * @todo Remove once macOS is fixed.
+	 */
+	if (macos_quirk_applies(
+		    op_ctx->export_perms.macos_quirks.named_attr_nverify) &&
+	    nfs4_object_type(data->current_obj) == EXTENDED_ATTR) {
+		res_NVERIFY4->status = NFS4ERR_NOTSUPP;
+		return NFS_REQ_ERROR;
+	}
+#endif
+
 	/* Get only attributes that are allowed to be read */
 	if (!nfs4_Fattr_Check_Access(&arg_NVERIFY4->obj_attributes,
 				     FATTR4_ATTR_READ)) {

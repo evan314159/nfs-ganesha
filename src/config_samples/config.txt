@@ -493,6 +493,9 @@ EXPORT_DEFAULTS { CLIENT  {} }
 	HA_Proxy_Protocol(enum list, values [with_ha_proxy, without_ha_proxy,
 					     any], default [any])
 
+	macOS_quirk_named_attr_NVERIFY(bool, default false)
+		* macOS client workarounds; see ganesha-export-config(8).
+
 	Clients(client list, empty)
 
 	* Client list entries can take on one of the following forms. This
