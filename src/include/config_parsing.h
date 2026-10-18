@@ -767,7 +767,7 @@ struct config_item {
 	  .type = CONFIG_UINT32,                       \
 	  .flags = CONFIG_MODE | CONFIG_UNIQUE,        \
 	  .u.ui32.minval = 0,                          \
-	  .u.ui32.maxval = 0777,                       \
+	  .u.ui32.maxval = 07777,                      \
 	  .u.ui32.def = _def_,                         \
 	  .u.ui32.zero_ok = true,                      \
 	  .off = offsetof(struct _struct_, _mem_) }

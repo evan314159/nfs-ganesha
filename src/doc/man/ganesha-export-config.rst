@@ -283,6 +283,23 @@ MaxOffsetRead (INT64_MAX)
     Maximum file offset that may be read
     Range is 512 to UINT64_MAX
 
+Force_Create_Mode(mode, range 0 to 07777, default 0)
+    Mode bits added to every new regular file, as Samba's "force create
+    mode". While not 0, SETATTR can change only a file's execute bits, if
+    permitted by Create_Mask. See DISCUSSION.
+
+Force_Directory_Mode(mode, range 0 to 07777, default 0)
+    The same as Force_Create_Mode, for new directories.
+
+Create_Mask(mode, range 0 to 07777, default 07777)
+    Mode bits a new regular file can keep, as Samba's "create mask". The
+    other bits are cleared before Force_Create_Mode is applied. While not
+    07777, SETATTR can change only a file's execute bits, if permitted by
+    the mask. See DISCUSSION.
+
+Directory_Mask(mode, range 0 to 07777, default 07777)
+    The same as Create_Mask, for new directories.
+
 DisableReaddirPlus(bool, default false)
 
 DisableDirChaching(bool, default false)
@@ -317,8 +334,8 @@ Server_Addrs(comma-separated IP list, no default)
     interface an incoming request must have arrived on in order to be granted
     access to this export.
 
-    When this parameter is set, Ganesha checks the destination address of each
-    incoming RPC request (i.e. the IP address on the server side of the
+    When this parameter is set, NFS-Ganesha checks the destination address of
+    each incoming RPC request (i.e. the IP address on the server side of the
     connection) against the list.  If the destination address does not match
     any entry in the list, the request is denied with no access.
     When this parameter is absent or empty, no server-address filtering is
@@ -576,6 +593,69 @@ the Protocols option at all such that it defaults to 3,4. Note though that
 if it is not set and EXPORT_DEFAULTS just has Protocols = 3; then even though
 the export is mounted in the Pseudo Filesystem, it will not be accessible and
 the gotcha discussed above may be in play.
+
+Create masks and forced modes
+--------------------------------------------------------------------------------
+With default settings, new files and directories get the mode the client asks
+for, so their permissions depend on each client's umask and applications.
+Create_Mask, Force_Create_Mode, Directory_Mask and Force_Directory_Mode put
+the permissions under the control of the server's administrator instead.
+
+Create_Mask and Directory_Mask clear bits from the mode the client asks for,
+and Force_Create_Mode and Force_Directory_Mode add bits. Clients cannot choose
+other permissions, either when they create a file or by changing its mode
+later, except for execute bits the mask allows. This is useful to keep
+consistent permissions on an export shared across several users. It is also
+useful when the same directory is shared by Samba with the same settings
+applied, so that both Samba and NFS-Ganesha can behave alike.
+
+When a regular file or directory is created, its mode is::
+
+    file mode      = (requested & Create_Mask) | Force_Create_Mode
+    directory mode = (requested & Directory_Mask) | Force_Directory_Mode
+
+The FSAL's umask option, if set, is applied after the mask and forced bits.
+Symbolic links, devices, FIFOs and sockets are not affected.
+
+Where an export masks or forces the mode, a SETATTR by any user, including
+root, can change only the execute bits, and only where permitted by the mask.
+Without this, clients could undo the settings. macOS Finder, for example,
+sets a copied file's mode back to the source file's mode after copying it.
+The restriction also applies to files and directories that existed before the
+options were set.
+
+For example, suppose an export holds a directory tree shared by the members
+of a group. Every member must be able to read and write everything any of
+them creates, nobody outside the group may have access, and files are
+executable only if the client created them that way. The tree's top
+directory belongs to the group and has the setgid bit set, so new files and
+directories take its group. The following EXPORT block achieves this::
+
+    EXPORT
+    {
+        Export_Id = 1;
+        Path = /export/shared;
+        Pseudo = /export/shared;
+        Create_Mask = 0770;
+        Force_Create_Mode = 0660;
+        Directory_Mask = 0770;
+        Force_Directory_Mode = 02770;
+
+        FSAL
+        {
+            Name = VFS;
+        }
+    }
+
+Create_Mask = 0770 clears the bits for others and the setuid, setgid and
+sticky bits, and Force_Create_Mode = 0660 adds read and write for the owner
+and group. A chmod of a file can still add or remove execute for the owner
+and group. To prevent files from ever being executable, Create_Mask = 0660
+clears execute bits on file creation or chmod.
+
+Every new directory gets 02770, so the setgid bit carries the group down the
+tree. On Linux, a new directory inherits the setgid bit from its parent, so
+with FSAL_VFS Force_Directory_Mode = 0770 has the same effect.
 
 CONFIGURATION RELOAD
 ==============================

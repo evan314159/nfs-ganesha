@@ -132,6 +132,17 @@ EXPORT_DEFAULTS
 #					These options may be used to restrict
 #					the offsets within files.
 #
+# Force_Create_Mode (0)		Mode bits OR'd into every new regular file,
+#				as Samba's "force create mode". While not 0,
+#				SETATTR can change only the execute bits.
+# Force_Directory_Mode (0)	The same, for directories.
+#
+# Create_Mask (07777)		Mode bits a new regular file can keep, as
+#				Samba's "create mask". Applied before
+#				Force_Create_Mode. While not 07777, SETATTR
+#				is limited in the same way.
+# Directory_Mask (07777)	The same, for directories.
+#
 # DisableDirChaching (false)   Disable directory chaching for this export.
 #                              If set to true, directory entries will not be
 #                              cached. This option helps in certain cases like

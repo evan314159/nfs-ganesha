@@ -97,7 +97,7 @@ PROXY_V4 {}
 **maxwrite(uint64, default MAX_READ_WRITE_SIZE)**
     range 512 to FSAL_MAXIOSIZE - SEND_RECV_HEADER_SPACE
 
-**umask(mode, range 0 to 0777, default 0)**
+**umask(mode, range 0 to 07777, default 0)**
 
 **auth_xdev_export(bool, default false)**
 

@@ -212,6 +212,22 @@ struct gsh_export {
 	/** CFG: Controls when to run permission check for read, lookup
 	and readdir */
 	uint32_t access_check_policies;
+	/** CFG: Mode bits OR'd into newly created regular files; when non-zero
+	 *  SETATTR may change only the execute bits of a regular file's mode -
+	 *  atomic changeable option */
+	uint32_t force_create_mode;
+	/** CFG: Mode bits OR'd into newly created directories; when non-zero
+	 *  SETATTR may change only the execute bits of a directory's mode -
+	 *  atomic changeable option */
+	uint32_t force_directory_mode;
+	/** CFG: Mode bits newly created regular files may keep, applied before
+	 *  force_create_mode; when not 07777 SETATTR may change only the
+	 *  execute bits of a regular file's mode - atomic changeable option */
+	uint32_t create_mask;
+	/** CFG: Mode bits newly created directories may keep, applied before
+	 *  force_directory_mode; when not 07777 SETATTR may change only the
+	 *  execute bits of a directory's mode - atomic changeable option */
+	uint32_t directory_mask;
 
 	/** References to this export */
 	int64_t refcnt;
