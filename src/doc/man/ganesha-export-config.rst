@@ -110,6 +110,18 @@ HA_Proxy_Protocol(enum, default any)
     Possible values:
         with_ha_proxy, without_ha_proxy, any
 
+macOS_quirk_named_attr_NVERIFY(bool, default false)
+    Works around a macOS bug: macOS reads an extended attribute with
+    NVERIFY and READ, and can panic handling the reply. When set, NVERIFY
+    of a named attribute fails with NFS4ERR_NOTSUPP, so macOS reads the
+    value normally.
+
+The macOS quirks are not standard NFS behaviour. They exist only if Ganesha
+is built with the CMake option USE_MACOS_QUIRKS, which is off by default,
+and can only be set in CLIENT blocks. By default they apply only to macOS
+clients: see macOS_quirks_only_for_macOS_clients in
+:doc:`ganesha-core-config <ganesha-core-config>`\(8).
+
 Clients(client list, empty)
     Client list entries can take on one of the following forms. This parameter
     may be repeated to extend the list.

@@ -89,6 +89,18 @@ struct user_cred {
 	gid_t *caller_garray;
 };
 
+#ifdef USE_MACOS_QUIRKS
+/**
+ * @brief Workarounds for macOS client bugs, set in CLIENT blocks
+ *
+ * @todo Remove with the last macOS quirk.
+ */
+struct macos_quirks {
+	/* @todo Remove once macOS is fixed. */
+	bool named_attr_nverify; /*< Refuse NVERIFY of a named attribute */
+};
+#endif /* USE_MACOS_QUIRKS */
+
 struct export_perms {
 	/** root uid when no root access is available uid when access is
 	 *  available but all users are being squashed.
@@ -106,6 +118,13 @@ struct export_perms {
 	uint32_t options;
 	/** Permission Options that have been set */
 	uint32_t set;
+#ifdef USE_MACOS_QUIRKS
+	/** macOS quirks, only from a CLIENT block
+	 *
+	 * @todo Remove with the last macOS quirk.
+	 */
+	struct macos_quirks macos_quirks;
+#endif
 };
 
 /* Define bit values for cred_flags */

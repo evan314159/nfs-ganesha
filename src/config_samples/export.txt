@@ -208,6 +208,10 @@ EXPORT
 	# HA_Proxy_Protocol (with_ha_proxy, without_ha_proxy, any) Constraints
 	#                        Clients by usage of HA PROXY protocol
 	#
+	# macOS_quirk_named_attr_NVERIFY (false)
+	#			macOS client workarounds. See
+	#			ganesha-export-config(8).
+	#
 	# Clients (required)	The list of clients these export permissions
 	#			apply to. Clients may be specified by hostname,
 	#			ip address, netgroup, CIDR network address,
