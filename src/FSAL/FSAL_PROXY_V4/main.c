@@ -38,7 +38,8 @@
 #include "FSAL/fsal_init.h"
 #include "proxyv4_fsal_methods.h"
 
-#define PROXY_V4_SUPPORTED_ATTRS ((const attrmask_t)(ATTRS_POSIX))
+#define PROXY_V4_SUPPORTED_ATTRS \
+	((const attrmask_t)(ATTRS_POSIX | ATTR4_MOUNTED_ON_FILEID))
 
 /* filesystem info for PROXY_V4 */
 struct proxyv4_fsal_module

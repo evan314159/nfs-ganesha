@@ -348,7 +348,9 @@ uint32_t resp_room(compound_data_t *data);
 
 nfsstat4 check_resp_room(compound_data_t *data, uint32_t op_resp_size);
 
-void get_mounted_on_fileid(compound_data_t *data, uint64_t *mounted_on_fileid);
+void get_mounted_on_fileid(compound_data_t *data,
+			   const struct fsal_attrlist *attrs,
+			   uint64_t *mounted_on_fileid);
 
 #ifdef USE_NFSACL3
 posix_acl *encode_posix_acl(const acl_t acl, uint32_t type,

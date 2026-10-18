@@ -34,6 +34,7 @@
 #include <sys/sysmacros.h> /* for major(3), minor(3) */
 #endif
 #include <fcntl.h>
+#include <dirent.h>
 #if __FreeBSD__
 #include <sys/mount.h>
 #else
@@ -627,6 +628,65 @@ out:
 #endif
 }
 
+/**
+ * @brief Find the inode number of the directory a file system is mounted on
+ *
+ * The mount hides that directory: any path to it leads to the root of the
+ * mounted file system instead. Only the directory's entry in its parent
+ * directory still has its inode number, so read the parent directory to find
+ * it. ".." of the mounted file system's root is that parent directory.
+ *
+ * @param[in,out] fs  The file system; sets mounted_on_fileid if found
+ */
+static void posix_get_mounted_on_fileid(struct fsal_filesystem *fs)
+{
+	const char *name = strrchr(fs->path, '/') + 1;
+	struct dirent *dirent;
+	int root_fd, parent_fd, err;
+	DIR *dir;
+
+	root_fd = open(fs->path, O_RDONLY | O_DIRECTORY);
+
+	if (root_fd < 0) {
+		err = errno;
+		goto out;
+	}
+
+	parent_fd = openat(root_fd, "..", O_RDONLY | O_DIRECTORY);
+	err = errno;
+	close(root_fd);
+
+	if (parent_fd < 0)
+		goto out;
+
+	dir = fdopendir(parent_fd);
+
+	if (dir == NULL) {
+		err = errno;
+		close(parent_fd);
+		goto out;
+	}
+
+	while ((dirent = readdir(dir)) != NULL) {
+		if (strcmp(dirent->d_name, name) == 0) {
+			fs->mounted_on_fileid = dirent->d_ino;
+			LogInfo(COMPONENT_FSAL,
+				"File system %s is mounted on inode %" PRIu64,
+				fs->path, fs->mounted_on_fileid);
+			break;
+		}
+	}
+
+	/* This also closes parent_fd */
+	closedir(dir);
+	return;
+
+out:
+	LogDebug(COMPONENT_FSAL,
+		 "Could not read the parent directory of %s: %s", fs->path,
+		 strerror(err));
+}
+
 static void posix_create_file_system(struct gsh_export *exp, struct mntent *mnt,
 				     struct stat *mnt_stat)
 {
@@ -737,6 +797,8 @@ static void posix_create_file_system(struct gsh_export *exp, struct mntent *mnt,
 
 	fs->in_dev_avl = true;
 
+	fs->root_fileid = mnt_stat->st_ino;
+
 	glist_add_tail(&posix_file_systems, &fs->filesystems);
 	glist_init(&fs->children);
 
@@ -801,6 +863,8 @@ static void posix_find_parent(struct fsal_filesystem *this)
 	glist_add_tail(&this->parent->children, &this->siblings);
 	LogInfo(COMPONENT_FSAL, "File system %s is a child of %s", this->path,
 		this->parent->path);
+
+	posix_get_mounted_on_fileid(this);
 }
 
 static bool path_is_subset(const char *path, const char *of)

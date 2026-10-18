@@ -2199,7 +2199,25 @@ static fattr_xdr_result encode_mounted_on_fileid(XDR *xdr,
 static fattr_xdr_result decode_mounted_on_fileid(XDR *xdr,
 						 struct xdr_attrs_args *args)
 {
-	return FATTR_XDR_NOOP;
+	if (!inline_xdr_u_int64_t(xdr, &args->mounted_on_fileid))
+		return FATTR_XDR_FAILED;
+
+	/* The fattr4tab entry has no attrmask, so that mounted_on_fileid is
+	 * reported as supported whatever the FSAL (Ganesha falls back to
+	 * fileid). So the decode loop doesn't set the FSAL attribute in
+	 * valid_mask, and this does.
+	 *
+	 * PROXY_V4 uses this for the attributes its backend server returns.
+	 * SETATTR, OPEN and CREATE refuse mounted_on_fileid before decoding,
+	 * because it is read-only, and CB_GETATTR uses only the change, size
+	 * and times it decodes.
+	 */
+	if (args->attrs != NULL) {
+		args->attrs->mounted_on_fileid = args->mounted_on_fileid;
+		FSAL_SET_MASK(args->attrs->valid_mask, ATTR4_MOUNTED_ON_FILEID);
+	}
+
+	return FATTR_XDR_SUCCESS;
 }
 
 /*
@@ -3707,7 +3725,16 @@ void nfs4_Fattr_Free(fattr4 *fattr)
 	}
 }
 
-void get_mounted_on_fileid(compound_data_t *data, uint64_t *mounted_on_fileid)
+/**
+ * @brief Get the mounted_on_fileid of the current object
+ *
+ * @param[in]  data               Compound request's data
+ * @param[in]  attrs              Attributes of the current object, or NULL
+ * @param[out] mounted_on_fileid  Its mounted_on_fileid
+ */
+void get_mounted_on_fileid(compound_data_t *data,
+			   const struct fsal_attrlist *attrs,
+			   uint64_t *mounted_on_fileid)
 {
 	PTHREAD_RWLOCK_rdlock(&op_ctx->ctx_export->exp_lock);
 
@@ -3716,10 +3743,14 @@ void get_mounted_on_fileid(compound_data_t *data, uint64_t *mounted_on_fileid)
 		 * mounted_on_fileid and use that.
 		 */
 		*mounted_on_fileid = op_ctx->ctx_export->exp_mounted_on_file_id;
-	} else {
-		/* This is not the root of the current export, just
-		 * use fileid.
+	} else if (attrs != NULL &&
+		   FSAL_TEST_MASK(attrs->valid_mask, ATTR4_MOUNTED_ON_FILEID)) {
+		/* The FSAL gives it. It differs from fileid only for the root
+		 * of a file system.
 		 */
+		*mounted_on_fileid = attrs->mounted_on_fileid;
+	} else {
+		/* The FSAL does not give it, so use fileid. */
 		*mounted_on_fileid = data->current_obj->fileid;
 	}
 
@@ -3800,10 +3831,6 @@ nfsstat4 file_To_Fattr(compound_data_t *data, attrmask_t request_mask,
 #endif /* ENABLE_RFC_ACL */
 	}
 
-	if (attribute_is_set(Bitmap, FATTR4_MOUNTED_ON_FILEID)) {
-		get_mounted_on_fileid(data, &args.mounted_on_fileid);
-	}
-
 	/* Fill in fileid and fsid into args */
 	args.fileid = data->current_obj->fileid;
 	args.fsid = data->current_obj->fsid;
@@ -3849,6 +3876,9 @@ nfsstat4 file_To_Fattr(compound_data_t *data, attrmask_t request_mask,
 		if (FSAL_IS_ERROR(status))
 			return nfs4_Errno_status(status);
 	}
+
+	if (attribute_is_set(Bitmap, FATTR4_MOUNTED_ON_FILEID))
+		get_mounted_on_fileid(data, attr, &args.mounted_on_fileid);
 
 	/* Restore originally requested mask */
 	attr->request_mask = request_mask;
@@ -4826,6 +4856,17 @@ int bitmap4_to_attrmask_t(bitmap4 *bitmap4, attrmask_t *mask)
 		LogFullDebug(COMPONENT_NFS_V4, "Request attr %d, name = %s",
 			     attribute_to_set, f4e->name);
 	}
+
+	/* FATTR4_MOUNTED_ON_FILEID has no attrmask, so it is supported even if
+	 * the FSAL does not provide it: fileid is used instead. Only ask the
+	 * FSAL for it if the FSAL provides it. Otherwise MDCACHE would never
+	 * find it in its cache, and would ask the FSAL again every time.
+	 */
+	if (attribute_is_set(bitmap4, FATTR4_MOUNTED_ON_FILEID) &&
+	    (op_ctx->fsal_export->exp_ops.fs_supported_attrs(
+		     op_ctx->fsal_export) &
+	     ATTR4_MOUNTED_ON_FILEID))
+		*mask |= ATTR4_MOUNTED_ON_FILEID;
 
 	return nfs_status;
 }

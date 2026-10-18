@@ -371,6 +371,7 @@ static fsal_status_t fetch_attrs(struct vfs_fsal_obj_handle *myself, int my_fd,
 	* not be the device major/minor from stat.
 	*/
 	attrs->fsid = myself->obj_handle.fs->fsid;
+	fsal_fs_set_mounted_on_fileid(myself->obj_handle.fs, attrs);
 
 	if (myself->sub_ops && myself->sub_ops->getattrs) {
 		status = myself->sub_ops->getattrs(myself, my_fd,
@@ -1012,6 +1013,7 @@ retry_attr:
 		* not be the device major/minor from stat.
 		*/
 		attrs_out->fsid = myself->obj_handle.fs->fsid;
+		fsal_fs_set_mounted_on_fileid(myself->obj_handle.fs, attrs_out);
 	}
 
 	LogFullDebug(COMPONENT_FSAL, "Closing Opened dir fd %d", dir_fd);

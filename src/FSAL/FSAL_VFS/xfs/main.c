@@ -48,9 +48,11 @@
 
 /* defined the set of attributes supported with POSIX */
 #ifndef ENABLE_VFS_ACL
-#define XFS_SUPPORTED_ATTRIBUTES ((const attrmask_t)(ATTRS_POSIX))
+#define XFS_SUPPORTED_ATTRIBUTES \
+	((const attrmask_t)(ATTRS_POSIX | ATTR4_MOUNTED_ON_FILEID))
 #else
-#define XFS_SUPPORTED_ATTRIBUTES ((const attrmask_t)(ATTRS_POSIX | ATTR_ACL))
+#define XFS_SUPPORTED_ATTRIBUTES \
+	((const attrmask_t)(ATTRS_POSIX | ATTR_ACL | ATTR4_MOUNTED_ON_FILEID))
 #endif
 
 static const char myname[] = "XFS";

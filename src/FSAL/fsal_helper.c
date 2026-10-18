@@ -1335,6 +1335,7 @@ static enum fsal_dir_result populate_dirent(const char *name,
 		(struct fsal_populate_cb_state *)dir_state;
 	fsal_status_t status = { 0, 0 };
 	enum fsal_dir_result retval;
+	uint64_t mounted_on_fileid;
 
 	if (!state->post_access_check_done) {
 		status = allow_readdir(state->directory, state->attrmask,
@@ -1352,8 +1353,14 @@ static enum fsal_dir_result populate_dirent(const char *name,
 	retval = DIR_CONTINUE;
 	state->cb_parms.name = name;
 
-	status.major = state->cb(&state->cb_parms, obj, attrs, attrs->fileid,
-				 cookie, state->cb_state);
+	/* Use mounted_on_fileid if the FSAL gives it, else fileid */
+	mounted_on_fileid =
+		FSAL_TEST_MASK(attrs->valid_mask, ATTR4_MOUNTED_ON_FILEID)
+			? attrs->mounted_on_fileid
+			: attrs->fileid;
+
+	status.major = state->cb(&state->cb_parms, obj, attrs,
+				 mounted_on_fileid, cookie, state->cb_state);
 
 	if (status.major == ERR_FSAL_CROSS_JUNCTION) {
 		struct fsal_obj_handle *junction_obj;

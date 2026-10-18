@@ -354,7 +354,7 @@ extern struct gsh_refstr *no_export;
  * rules), increment the minor version
  */
 
-#define FSAL_MINOR_VERSION 0
+#define FSAL_MINOR_VERSION 1
 
 /* Forward references for object methods */
 
