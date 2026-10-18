@@ -579,6 +579,13 @@ macOS_quirks_only_for_macOS_clients(bool, default true)
     quirks exist only if Ganesha is built with the CMake option
     USE_MACOS_QUIRKS, which is off by default.
 
+macOS_quirk_pad_handles(bool, default false)
+    Works around a macOS bug: macOS cannot mount a file system nested inside
+    a mirror mount unless the parent's file handle length is a multiple of
+    4. When set, NFSv4 file handles are padded to a multiple of 4 bytes.
+    This ignores macOS_quirks_only_for_macOS_clients and applies to every
+    client, because callbacks send handles without knowing the client.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 

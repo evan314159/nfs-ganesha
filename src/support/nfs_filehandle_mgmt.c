@@ -164,6 +164,19 @@ bool nfs4_FSALToFhandle(bool allocate, nfs_fh4 *fh4,
 	/* Set the len */
 	fh4->nfs_fh4_len = nfs4_sizeof_handle(file_handle);
 
+#ifdef USE_MACOS_QUIRKS
+	/* With macOS_quirk_pad_handles, pad the handle to a multiple of 4
+	 * bytes. Mounting a file system nested inside a mirror mount fails on
+	 * the macOS client with EINVAL unless the file handle length is a
+	 * multiple of 4. valid_Fh4_Len() accepts the padded length when a
+	 * client sends it back.
+	 *
+	 * @todo Remove once macOS is fixed.
+	 */
+	if (nfs_param.nfsv4_param.macos_quirk_pad_handles)
+		fh4->nfs_fh4_len = nfs4_sizeof_handle_padding(file_handle);
+#endif
+
 	LogFullDebugOpaque(COMPONENT_FILEHANDLE, "NFS4 Handle %s", LEN_FH_STR,
 			   fh4->nfs_fh4_val, fh4->nfs_fh4_len);
 

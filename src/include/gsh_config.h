@@ -716,6 +716,10 @@ typedef struct nfs_version4_parameter {
 	    is settable with macOS_quirks_only_for_macOS_clients.
 	    @todo Remove with the last macOS quirk. */
 	bool macos_quirks_only_for_macos_clients;
+	/** Pad NFSv4 handles for every client. Settable with
+	    macOS_quirk_pad_handles.
+	    @todo Remove once macOS is fixed. */
+	bool macos_quirk_pad_handles;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */
