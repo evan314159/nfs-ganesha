@@ -40,7 +40,9 @@
  *
  * 1 byte		handle_len (doesn't go on wire)
  * 1 byte		flags
- *				00xxxxxx fsid_type
+ *				00000xxx fsid_type
+ *				00010000 named attribute object, see namedattr.c
+ *				00100000 dummy handle
  *				01000000 handle_type fits in one byte
  *				10000000 handle_type fits in two bytes
  *				11000000 handle_type fits in four bytes
@@ -49,8 +51,9 @@
 #define HANDLE_TYPE_16 0x80
 #define HANDLE_TYPE_32 0xC0
 #define HANDLE_TYPE_MASK 0xC0
+#define HANDLE_ATTR 0x10
 #define HANDLE_DUMMY 0x20
-#define HANDLE_FSID_MASK (~(HANDLE_TYPE_MASK | HANDLE_DUMMY))
+#define HANDLE_FSID_MASK (~(HANDLE_TYPE_MASK | HANDLE_ATTR | HANDLE_DUMMY))
 /*
  * 0, 8, or 16 bytes	fsid type
  * 1,2 or 4 bytes	handle type
@@ -356,6 +359,22 @@ int vfs_encode_dummy_handle(vfs_file_handle_t *fh, struct fsal_filesystem *fs)
 bool vfs_is_dummy_handle(vfs_file_handle_t *fh)
 {
 	return (fh->handle_data[0] & HANDLE_DUMMY) != 0;
+}
+
+bool vfs_is_attr_handle(const vfs_file_handle_t *fh)
+{
+	return (fh->handle_data[0] & HANDLE_ATTR) != 0;
+}
+
+int vfs_set_attr_handle(vfs_file_handle_t *fh)
+{
+	fh->handle_data[0] |= HANDLE_ATTR;
+	return 0;
+}
+
+void vfs_clear_attr_handle(vfs_file_handle_t *fh)
+{
+	fh->handle_data[0] &= ~HANDLE_ATTR;
 }
 
 bool vfs_valid_handle(struct gsh_buffdesc *desc)

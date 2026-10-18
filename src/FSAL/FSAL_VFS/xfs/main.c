@@ -48,11 +48,13 @@
 
 /* defined the set of attributes supported with POSIX */
 #ifndef ENABLE_VFS_ACL
-#define XFS_SUPPORTED_ATTRIBUTES \
-	((const attrmask_t)(ATTRS_POSIX | ATTR4_MOUNTED_ON_FILEID))
+#define XFS_SUPPORTED_ATTRIBUTES                             \
+	((const attrmask_t)(ATTRS_POSIX | ATTR4_NAMED_ATTR | \
+			    ATTR4_MOUNTED_ON_FILEID))
 #else
-#define XFS_SUPPORTED_ATTRIBUTES \
-	((const attrmask_t)(ATTRS_POSIX | ATTR_ACL | ATTR4_MOUNTED_ON_FILEID))
+#define XFS_SUPPORTED_ATTRIBUTES                                        \
+	((const attrmask_t)(ATTRS_POSIX | ATTR_ACL | ATTR4_NAMED_ATTR | \
+			    ATTR4_MOUNTED_ON_FILEID))
 #endif
 
 static const char myname[] = "XFS";
@@ -73,7 +75,7 @@ static struct vfs_fsal_module XFS = {
 			.case_preserving = true,
 			.lock_support = false,
 			.lock_support_async_block = false,
-			.named_attr = true,
+			.named_attr = false,
 			.unique_handles = true,
 			.acl_support = FSAL_ACLSUPPORT_ALLOW,
 			.homogenous = true,
@@ -102,6 +104,8 @@ static struct config_item xfs_params[] = {
 	CONF_ITEM_BOOL("auth_xdev_export", false, vfs_fsal_module,
 		       module.fs_info.auth_exportpath_xdev),
 	CONF_ITEM_BOOL("only_one_user", false, vfs_fsal_module, only_one_user),
+	CONF_ITEM_BOOL("named_attr", false, vfs_fsal_module,
+		       module.fs_info.named_attr),
 	CONFIG_EOL
 };
 

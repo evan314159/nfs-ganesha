@@ -43,6 +43,9 @@ XFS {}
 
 **auth_xdev_export(bool, default false)**
 
+**named_attr(bool, default false)**
+    As for VFS: see :doc:`ganesha-vfs-config <ganesha-vfs-config>`\(8).
+
 See also
 ==============================
 :doc:`ganesha-log-config <ganesha-log-config>`\(8)
