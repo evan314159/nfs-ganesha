@@ -3779,6 +3779,21 @@ void get_mounted_on_fileid(compound_data_t *data,
 			   const struct fsal_attrlist *attrs,
 			   uint64_t *mounted_on_fileid)
 {
+#ifdef USE_MACOS_QUIRKS
+	/* Work around a macOS client bug: macOS uses mounted_on_fileid as the
+	 * inode number of every object, so for the top directory of a mounted
+	 * file system it would get a number from the file system underneath.
+	 * Return fileid in GETATTR instead. READDIR is not affected.
+	 *
+	 * @todo Remove once macOS is fixed.
+	 */
+	if (macos_quirk_applies(
+		    op_ctx->export_perms.macos_quirks.mounted_on_fileid)) {
+		*mounted_on_fileid = data->current_obj->fileid;
+		return;
+	}
+#endif
+
 	PTHREAD_RWLOCK_rdlock(&op_ctx->ctx_export->exp_lock);
 
 	if (data->current_obj == op_ctx->ctx_export->exp_root_obj) {

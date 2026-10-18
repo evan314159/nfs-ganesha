@@ -122,6 +122,14 @@ macOS_quirk_named_attr_truncate(bool, default false)
     end of the old one. When set, opening a named attribute for writing
     truncates it, except com.apple.ResourceFork.
 
+macOS_quirk_mounted_on_fileid(bool, default false)
+    Works around a macOS bug: RFC 8881 says stat() returns fileid and only
+    readdir() returns mounted_on_fileid, but macOS uses mounted_on_fileid
+    for both. So stat() of the top directory of a mounted file system gives
+    the inode number of the directory it is mounted on, which a file inside
+    can also have, and du reports a cycle. When set, GETATTR returns fileid
+    as mounted_on_fileid. READDIR is unchanged.
+
 The macOS quirks are not standard NFS behaviour. They exist only if Ganesha
 is built with the CMake option USE_MACOS_QUIRKS, which is off by default,
 and can only be set in CLIENT blocks. By default they apply only to macOS

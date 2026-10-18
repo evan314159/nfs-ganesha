@@ -208,8 +208,8 @@ EXPORT
 	# HA_Proxy_Protocol (with_ha_proxy, without_ha_proxy, any) Constraints
 	#                        Clients by usage of HA PROXY protocol
 	#
-	# macOS_quirk_named_attr_NVERIFY, macOS_quirk_named_attr_truncate
-	# (false)
+	# macOS_quirk_named_attr_NVERIFY, macOS_quirk_named_attr_truncate,
+	# macOS_quirk_mounted_on_fileid (false)
 	#			macOS client workarounds. See
 	#			ganesha-export-config(8).
 	#

@@ -100,6 +100,9 @@ struct macos_quirks {
 	bool named_attr_nverify; /*< Refuse NVERIFY of a named attribute */
 	/* @todo Remove once macOS is fixed. */
 	bool named_attr_truncate; /*< Truncate a named attribute on open */
+	/* @todo Remove once macOS is fixed. */
+	bool mounted_on_fileid; /*< GETATTR returns fileid as
+				    mounted_on_fileid */
 };
 #endif /* USE_MACOS_QUIRKS */
 
