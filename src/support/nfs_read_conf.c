@@ -937,6 +937,9 @@ static struct config_item version4_params[] = {
 	CONF_ITEM_BOOL("macOS_quirks_only_for_macOS_clients", true,
 		       nfs_version4_parameter,
 		       macos_quirks_only_for_macos_clients),
+	/* @todo Remove once macOS is fixed. */
+	CONF_ITEM_BOOL("macOS_quirk_pad_handles", false, nfs_version4_parameter,
+		       macos_quirk_pad_handles),
 #endif
 	CONF_ITEM_BOOL("Delegations", false, nfs_version4_parameter,
 		       allow_delegations),
