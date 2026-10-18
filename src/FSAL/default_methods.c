@@ -869,6 +869,17 @@ static fsal_status_t lookup(struct fsal_obj_handle *parent, const char *path,
 	return fsalstat(ERR_FSAL_NOTSUPP, ENOTSUP);
 }
 
+/* openattr
+ * default case not supported
+ */
+
+static fsal_status_t openattr(struct fsal_obj_handle *obj_hdl, bool createdir,
+			      struct fsal_obj_handle **attrdir,
+			      struct fsal_attrlist *attrs_out)
+{
+	return fsalstat(ERR_FSAL_NOTSUPP, ENOTSUP);
+}
+
 /* read_dirents
  * default case not supported
  */
@@ -1588,6 +1599,7 @@ struct fsal_obj_ops def_handle_ops = {
 	.close2 = close2,
 	.copy_file_range = default_copy_file_range,
 	.is_referral = is_referral,
+	.openattr = openattr,
 };
 
 /* fsal_pnfs_ds common methods */

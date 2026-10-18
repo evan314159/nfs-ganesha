@@ -106,6 +106,14 @@ enum nfs_req_result nfs4_op_create(struct nfs_argop4 *op, compound_data_t *data,
 	if (res_CREATE4->status != NFS4_OK)
 		goto out;
 
+	/* CREATE in a named attribute directory is NFS4ERR_WRONG_TYPE (RFC 8881
+	 * 18.4.3): named attributes are created by OPEN.
+	 */
+	if (nfs4_object_type(data->current_obj) == ATTR_DIRECTORY) {
+		res_CREATE4->status = NFS4ERR_WRONG_TYPE;
+		goto out;
+	}
+
 	/* if quota support is active, then we should check is the FSAL allows
 	 * inode creation or not */
 	exp_hdl = op_ctx->fsal_export;

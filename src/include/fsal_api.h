@@ -2903,6 +2903,26 @@ struct fsal_obj_ops {
 	bool (*is_referral)(struct fsal_obj_handle *obj_hdl,
 			    struct fsal_attrlist *attrs, bool cache_attrs);
 
+	/**
+ * @brief Get the named attribute directory of an object
+ *
+ * This implements NFSv4 OPENATTR. The directory's entries are the object's
+ * named attributes, which are opened, read and written like files.
+ *
+ * @param[in]  obj_hdl    Object whose named attributes are wanted
+ * @param[in]  createdir  Create the directory if the object has none
+ * @param[out] attrdir    The named attribute directory
+ * @param[out] attrs_out  Optional attributes of the directory
+ *
+ * @return FSAL status; ERR_FSAL_NOENT if there is no directory and
+ *         createdir is false.
+ */
+
+	fsal_status_t (*openattr)(struct fsal_obj_handle *obj_hdl,
+				  bool createdir,
+				  struct fsal_obj_handle **attrdir,
+				  struct fsal_attrlist *attrs_out);
+
 	/**@{*/
 
 	/**

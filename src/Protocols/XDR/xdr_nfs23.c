@@ -258,6 +258,10 @@ bool xdr_fattr3(XDR *xdrs, fattr3 *objp)
 			ft = NF3REG;
 			break;
 
+		case ATTR_DIRECTORY:
+			ft = NF3DIR;
+			break;
+
 		case SYMBOLIC_LINK:
 			ft = NF3LNK;
 			break;

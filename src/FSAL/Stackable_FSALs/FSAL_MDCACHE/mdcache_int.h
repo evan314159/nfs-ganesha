@@ -577,6 +577,25 @@ static inline struct mdcache_fsal_export *mdc_cur_export(void)
 	return mdc_export(op_ctx->fsal_export);
 }
 
+/**
+ * @brief Get the dirent caching mode for a directory
+ *
+ * The entries of named attribute directories are never cached: they are the
+ * object's extended attributes, which can change without anything mdcache
+ * watches changing.
+ *
+ * @param[in] dir  The directory
+ *
+ * @return The readdir mode.
+ */
+static inline enum fsal_readdir_mode mdc_readdir_mode(mdcache_entry_t *dir)
+{
+	if (dir->attrs.type == ATTR_DIRECTORY)
+		return FSAL_RDDIR_CHUNK_NEVER;
+
+	return get_readdir_mode();
+}
+
 void mdc_clean_entry(mdcache_entry_t *entry);
 fsal_status_t mdc_check_mapping(mdcache_entry_t *entry);
 void _mdcache_kill_entry(mdcache_entry_t *entry, char *file, int line,
