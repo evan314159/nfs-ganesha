@@ -932,6 +932,12 @@ static struct config_item version4_params[] = {
 		       allow_numeric_owners),
 	CONF_ITEM_BOOL("Only_Numeric_Owners", false, nfs_version4_parameter,
 		       only_numeric_owners),
+#ifdef USE_MACOS_QUIRKS
+	/* @todo Remove with the last macOS quirk. */
+	CONF_ITEM_BOOL("macOS_quirks_only_for_macOS_clients", true,
+		       nfs_version4_parameter,
+		       macos_quirks_only_for_macos_clients),
+#endif
 	CONF_ITEM_BOOL("Delegations", false, nfs_version4_parameter,
 		       allow_delegations),
 	CONF_ITEM_UI32("Deleg_Recall_Retry_Delay", 0, 10,
