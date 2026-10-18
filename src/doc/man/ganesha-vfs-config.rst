@@ -46,7 +46,7 @@ VFS {}
 
 **maxwrite(uint64, range 512 to 64*1024*1024, default 64*1024*1024)**
 
-**umask(mode, range 0 to 0777, default 0)**
+**umask(mode, range 0 to 07777, default 0)**
 
 **auth_xdev_export(bool, default false)**
 

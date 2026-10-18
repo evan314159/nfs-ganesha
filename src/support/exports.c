@@ -1173,6 +1173,12 @@ static inline void update_atomic_fields(struct gsh_export *export,
 	atomic_store_uint32_t(&export->options_set, src->options_set);
 	atomic_store_uint32_t(&export->access_check_policies,
 			      src->access_check_policies);
+	atomic_store_uint32_t(&export->force_create_mode,
+			      src->force_create_mode);
+	atomic_store_uint32_t(&export->force_directory_mode,
+			      src->force_directory_mode);
+	atomic_store_uint32_t(&export->create_mask, src->create_mask);
+	atomic_store_uint32_t(&export->directory_mask, src->directory_mask);
 }
 
 static inline void copy_gsh_export(struct gsh_export *dest,
@@ -2633,6 +2639,13 @@ static struct config_item fsal_params[] = {
 			       _struct_, MaxOffsetWrite),                      \
 		CONF_ITEM_UI64("MaxOffsetRead", 512, UINT64_MAX, INT64_MAX,    \
 			       _struct_, MaxOffsetRead),                       \
+		CONF_ITEM_MODE("Force_Create_Mode", 0, _struct_,               \
+			       force_create_mode),                             \
+		CONF_ITEM_MODE("Force_Directory_Mode", 0, _struct_,            \
+			       force_directory_mode),                          \
+		CONF_ITEM_MODE("Create_Mask", 07777, _struct_, create_mask),   \
+		CONF_ITEM_MODE("Directory_Mask", 07777, _struct_,              \
+			       directory_mask),                                \
 		CONF_ITEM_BOOLBIT_SET("UseCookieVerifier", false,              \
 				      EXPORT_OPTION_USE_COOKIE_VERIFIER,       \
 				      _struct_, options, options_set),         \

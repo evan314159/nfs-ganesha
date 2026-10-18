@@ -29,7 +29,7 @@ GPFS {}
 
 **cansettime(bool, default true)**
 
-**umask(mode, range 0 to 0777, default 0)**
+**umask(mode, range 0 to 07777, default 0)**
 
 **auth_xdev_export(bool, default false)**
 

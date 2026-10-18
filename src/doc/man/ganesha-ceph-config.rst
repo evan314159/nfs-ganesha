@@ -61,7 +61,7 @@ CEPH {}
 Ceph_Conf(path, default "")
     Path to the ceph config file to inherit ceph configuration from.
 
-umask(mode, range 0 to 0777, default 0)
+umask(mode, range 0 to 07777, default 0)
 
 client_oc(bool, default false)
     Enable or disable client_oc (object cache). This defaults to false because

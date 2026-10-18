@@ -283,6 +283,22 @@ MaxOffsetRead (INT64_MAX)
     Maximum file offset that may be read
     Range is 512 to UINT64_MAX
 
+Force_Create_Mode(mode, range 0 to 07777, default 0)
+    Mode bits OR'd into every new regular file, as Samba's "force create
+    mode". While not 0, SETATTR of a regular file's mode can change only
+    its execute bits.
+
+Force_Directory_Mode(mode, range 0 to 07777, default 0)
+    The same, for directories.
+
+Create_Mask(mode, range 0 to 07777, default 07777)
+    Mode bits a new regular file can keep, as Samba's "create mask".
+    Applied before Force_Create_Mode. While not 07777, SETATTR of the mode
+    is limited as for Force_Create_Mode.
+
+Directory_Mask(mode, range 0 to 07777, default 07777)
+    The same, for directories.
+
 DisableReaddirPlus(bool, default false)
 
 DisableDirChaching(bool, default false)

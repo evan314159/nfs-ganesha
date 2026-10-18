@@ -550,6 +550,22 @@ EXPORT {}
 
 	MaxOffsetRead(uint64, range 512 to UINT64_MAX, default INT64_MAX)
 
+	Force_Create_Mode(mode, range 0 to 07777, default 0)
+		* Mode bits OR'd into every new regular file, as Samba's
+		  "force create mode". While not 0, SETATTR of a regular
+		  file's mode can change only its execute bits.
+
+	Force_Directory_Mode(mode, range 0 to 07777, default 0)
+		* The same, for directories.
+
+	Create_Mask(mode, range 0 to 07777, default 07777)
+		* Mode bits a new regular file can keep, as Samba's "create
+		  mask". Applied before Force_Create_Mode. While not 07777,
+		  SETATTR of the mode is limited as for Force_Create_Mode.
+
+	Directory_Mask(mode, range 0 to 07777, default 07777)
+		* The same, for directories.
+
 	DisableReaddirPlus(bool, default false)
 
 	DisableDirCaching(bool, default false)
@@ -1165,7 +1181,7 @@ CEPH {}
 
 	Ceph_Conf(path, default "")
 
-	umask(mode, range 0 to 0777, default 0)
+	umask(mode, range 0 to 07777, default 0)
 
 	client_oc(bool, default false)
 
@@ -1195,7 +1211,7 @@ GPFS {}
 
 	cansettime(bool, default true)
 
-	umask(mode, range 0 to 0777, default 0)
+	umask(mode, range 0 to 07777, default 0)
 
 	auth_xdev_export(bool, default false)
 
@@ -1264,7 +1280,7 @@ VFS {}
 
 	maxwrite(uint64, range 512 to 64*1024*1024, default 64*1024*1024)
 
-	umask(mode, range 0 to 0777, default 0)
+	umask(mode, range 0 to 07777, default 0)
 
 	auth_xdev_export(bool, default false)
 
@@ -1287,7 +1303,7 @@ XFS {}
 
 	maxwrite(uint64, range 512 to 64*1024*1024, default 64*1024*1024)
 
-	umask(mode, range 0 to 0777, default 0)
+	umask(mode, range 0 to 07777, default 0)
 
 	auth_xdev_export(bool, default false)
 
@@ -1326,7 +1342,7 @@ PROXY_V4 {}
 	maxwrite(uint64, range 512 to FSAL_MAXIOSIZE - SEND_RECV_HEADER_SPACE,
 		 default MAX_READ_WRITE_SIZE)
 
-	umask(mode, range 0 to 0777, default 0)
+	umask(mode, range 0 to 07777, default 0)
 
 	auth_xdev_export(bool, default false)
 

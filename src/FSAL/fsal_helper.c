@@ -482,6 +482,127 @@ fsal_status_t open2_by_name(struct fsal_obj_handle *in_obj,
 }
 
 /**
+ * @brief Get the export's mode mask and forced mode bits for an object type
+ *
+ * Create_Mask and Force_Create_Mode apply to regular files, Directory_Mask
+ * and Force_Directory_Mode to directories. Other object types are never
+ * masked or forced.
+ *
+ * @param[in]  type        Object type
+ * @param[out] mask        Mode bits a new object may keep
+ * @param[out] force_mode  Mode bits OR'd into a new object
+ *
+ * @return true if the export controls the mode of this type of object.
+ */
+static bool fsal_export_mode(object_file_type_t type, uint32_t *mask,
+			     uint32_t *force_mode)
+{
+	*mask = 07777;
+	*force_mode = 0;
+
+	if (op_ctx->ctx_export == NULL)
+		return false;
+
+	switch (type) {
+	case REGULAR_FILE:
+		*mask = atomic_fetch_uint32_t(&op_ctx->ctx_export->create_mask);
+		*force_mode = atomic_fetch_uint32_t(
+			&op_ctx->ctx_export->force_create_mode);
+		break;
+	case DIRECTORY:
+		*mask = atomic_fetch_uint32_t(
+			&op_ctx->ctx_export->directory_mask);
+		*force_mode = atomic_fetch_uint32_t(
+			&op_ctx->ctx_export->force_directory_mode);
+		break;
+	default:
+		return false;
+	}
+
+	return *mask != 07777 || *force_mode != 0;
+}
+
+/**
+ * @brief Apply the export's mode mask and forced mode bits to a new object
+ *
+ * As with Samba, the mask is applied first and the forced bits are then
+ * OR'd in.
+ *
+ * @param[in]     type   Type of object being created
+ * @param[in,out] attrs  Attributes the object is being created with
+ */
+static void fsal_apply_export_mode(object_file_type_t type,
+				   struct fsal_attrlist *attrs)
+{
+	uint32_t mask, force_mode;
+
+	if (!fsal_export_mode(type, &mask, &force_mode) ||
+	    !FSAL_TEST_MASK(attrs->valid_mask, ATTR_MODE))
+		return;
+
+	LogFullDebug(
+		COMPONENT_FSAL,
+		"Applying mask %04o and forced mode %04o to create mode %04o",
+		mask, force_mode, attrs->mode);
+
+	attrs->mode = (attrs->mode & mask) | force_mode;
+}
+
+/**
+ * @brief Restrict a SETATTR of the mode to what the export allows
+ *
+ * When the export masks or forces mode bits for this type of object, only
+ * the execute bits may be changed, and only to what the mask and forced
+ * bits allow. The other bits keep their current values. If that leaves the
+ * mode unchanged, the mode is dropped from the request.
+ *
+ * @param[in]     obj   Object whose attributes are being set
+ * @param[in,out] attr  Attributes to set, ATTR_MODE is set
+ *
+ * @return FSAL status
+ */
+static fsal_status_t fsal_restrict_setattr_mode(struct fsal_obj_handle *obj,
+						struct fsal_attrlist *attr)
+{
+	fsal_status_t status;
+	struct fsal_attrlist current;
+	uint32_t mask, force_mode, exec_bits, mode;
+	bool unchanged;
+
+	if (!fsal_export_mode(obj->type, &mask, &force_mode))
+		return fsalstat(ERR_FSAL_NO_ERROR, 0);
+
+	fsal_prepare_attrs(&current, ATTR_MODE);
+
+	status = obj->obj_ops->getattrs(obj, &current);
+
+	if (FSAL_IS_ERROR(status))
+		return status;
+
+	exec_bits = ((attr->mode & mask) | force_mode) & 0111;
+	mode = (current.mode & 07666) | exec_bits;
+	unchanged = mode == (current.mode & 07777);
+
+	fsal_release_attrs(&current);
+
+	if (unchanged) {
+		LogFullDebug(
+			COMPONENT_FSAL,
+			"Ignoring mode change to %04o, mode is controlled by the export",
+			attr->mode);
+		FSAL_UNSET_MASK(attr->valid_mask, ATTR_MODE);
+	} else {
+		LogFullDebug(
+			COMPONENT_FSAL,
+			"Restricting mode change to %04o to execute bits, mode %04o",
+			attr->mode, mode);
+		attr->mode = mode;
+	}
+
+	return fsalstat(ERR_FSAL_NO_ERROR, 0);
+}
+
+/**
  * @brief Set attributes on a file
  *
  * The new attributes are copied over @a attr on success.
@@ -502,6 +623,13 @@ fsal_status_t fsal_setattr(struct fsal_obj_handle *obj, bool bypass,
 	fsal_status_t status = { 0, 0 };
 	struct fsal_attrlist current;
 	bool is_superuser;
+
+	if (FSAL_TEST_MASK(attr->valid_mask, ATTR_MODE)) {
+		status = fsal_restrict_setattr_mode(obj, attr);
+
+		if (FSAL_IS_ERROR(status))
+			return status;
+	}
 
 	if ((attr->valid_mask & (ATTR_SIZE | ATTR4_SPACE_RESERVED)) &&
 	    (obj->type != REGULAR_FILE)) {
@@ -1096,6 +1224,8 @@ fsal_status_t fsal_create(struct fsal_obj_handle *parent, const char *name,
 	if ((attrs->valid_mask & ATTR_GROUP) &&
 	    attrs->group == op_ctx->creds.caller_gid)
 		FSAL_UNSET_MASK(attrs->valid_mask, ATTR_GROUP);
+
+	fsal_apply_export_mode(type, attrs);
 
 	/* Permission checking will be done by the FSAL operation. */
 
@@ -1846,6 +1976,9 @@ fsal_status_t fsal_open2(struct fsal_obj_handle *in_obj, struct state_t *state,
 				 fsal_err_txt(status));
 			return status;
 		}
+
+		if (createmode != FSAL_NO_CREATE)
+			fsal_apply_export_mode(REGULAR_FILE, attr);
 	}
 
 	/* Handle attribute size = 0 here, normalize to FSAL_O_TRUNC
