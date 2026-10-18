@@ -297,12 +297,36 @@ bool vfs_is_dummy_handle(vfs_file_handle_t *fh)
 	return hdl->ha_fid.fid_pad != 0;
 }
 
+/* An XFS handle is always sizeof(xfs_handle_t), so the trailer namedattr.c
+ * appends is enough to mark a named attribute handle: there is no flag to set
+ * or clear.
+ */
+bool vfs_is_attr_handle(const vfs_file_handle_t *fh)
+{
+	return fh->handle_len > sizeof(xfs_handle_t);
+}
+
+int vfs_set_attr_handle(vfs_file_handle_t *fh)
+{
+	return 0;
+}
+
+void vfs_clear_attr_handle(vfs_file_handle_t *fh)
+{
+}
+
 bool vfs_valid_handle(struct gsh_buffdesc *desc)
 {
 	xfs_handle_t *hdl = (xfs_handle_t *)desc->addr;
 	bool fsid_type_ok = false;
 
-	if ((desc->addr == NULL) || (desc->len != sizeof(xfs_handle_t)))
+	/* Named attribute handles add a 1 or 9 byte trailer; namedattr.c
+	 * checks it.
+	 */
+	if (desc->addr == NULL ||
+	    (desc->len != sizeof(xfs_handle_t) &&
+	     desc->len != sizeof(xfs_handle_t) + 1 &&
+	     desc->len != sizeof(xfs_handle_t) + 1 + sizeof(uint64_t)))
 		return false;
 
 	if (isMidDebug(COMPONENT_FSAL)) {

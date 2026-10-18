@@ -1270,6 +1270,10 @@ VFS {}
 
 	only_one_user(bool, default false)
 
+	named_attr(bool, default false)
+		* NFSv4 named attributes, stored as "user." extended
+		  attributes. Linux only; see ganesha-vfs-config(8).
+
 XFS {}
 ------
 
@@ -1286,6 +1290,9 @@ XFS {}
 	umask(mode, range 0 to 0777, default 0)
 
 	auth_xdev_export(bool, default false)
+
+	named_attr(bool, default false)
+		* As for VFS.
 
 PROXY_V3 {}
 --------

@@ -52,6 +52,13 @@ VFS {}
 
 **only_one_user(bool, default false)**
 
+**named_attr(bool, default false)**
+    Support NFSv4 named attributes (OPENATTR). Each one is stored as a
+    "user." extended attribute: the named attribute "foo" is the extended
+    attribute "user.foo". A value can be at most the file system's
+    extended attribute size (64 KiB on Linux). Linux only: elsewhere
+    OPENATTR returns NFS4ERR_NOTSUPP.
+
 See also
 ==============================
 :doc:`ganesha-log-config <ganesha-log-config>`\(8)

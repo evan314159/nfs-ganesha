@@ -374,6 +374,8 @@ static fsal_status_t fetch_attrs(struct vfs_fsal_obj_handle *myself, int my_fd,
 	attrs->fsid = myself->obj_handle.fs->fsid;
 	fsal_fs_set_mounted_on_fileid(myself->obj_handle.fs, attrs);
 
+	vfs_get_named_attr(my_fd, NULL, attrs);
+
 	if (myself->sub_ops && myself->sub_ops->getattrs) {
 		status = myself->sub_ops->getattrs(myself, my_fd,
 						   attrs->request_mask, attrs);
@@ -1015,6 +1017,8 @@ retry_attr:
 		*/
 		attrs_out->fsid = myself->obj_handle.fs->fsid;
 		fsal_fs_set_mounted_on_fileid(myself->obj_handle.fs, attrs_out);
+
+		vfs_get_named_attr(dir_fd, name, attrs_out);
 	}
 
 	LogFullDebug(COMPONENT_FSAL, "Closing Opened dir fd %d", dir_fd);
@@ -2382,6 +2386,10 @@ fsal_status_t vfs_copy_file_range(struct fsal_obj_handle *src_hdl,
 	off_t d_off = (off_t)dst_off;
 	ssize_t rc;
 	fsal_status_t status, status2;
+
+	/* Copying into a named attribute is not supported */
+	if (vfs_is_attr_obj(dst_hdl))
+		return fsalstat(ERR_FSAL_XDEV, 0);
 
 	/* Acquire src fd — reuses the state's existing fd when src_state is
 	 * an OPEN state, otherwise opens a temporary fd.  bypass=true because

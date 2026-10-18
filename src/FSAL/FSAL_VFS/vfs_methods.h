@@ -66,6 +66,23 @@ struct vfs_fsal_export {
 
 void vfs_handle_ops_init(struct fsal_obj_ops *ops);
 
+/* Named attributes (namedattr.c) */
+fsal_status_t vfs_openattr(struct fsal_obj_handle *obj_hdl, bool createdir,
+			   struct fsal_obj_handle **attrdir,
+			   struct fsal_attrlist *attrs_out);
+fsal_status_t vfs_attr_create_handle(struct fsal_export *exp_hdl,
+				     struct fsal_filesystem *fs,
+				     vfs_file_handle_t *fh,
+				     struct fsal_obj_handle **handle,
+				     struct fsal_attrlist *attrs_out);
+void vfs_get_named_attr(int fd, const char *path, struct fsal_attrlist *attrs);
+bool vfs_is_attr_obj(const struct fsal_obj_handle *obj_hdl);
+
+/* Marking handles of named attribute objects (handle_syscalls.c) */
+bool vfs_is_attr_handle(const vfs_file_handle_t *fh);
+int vfs_set_attr_handle(vfs_file_handle_t *fh);
+void vfs_clear_attr_handle(vfs_file_handle_t *fh);
+
 static inline int root_fd(struct fsal_filesystem *fs)
 {
 	int fd = (long)fs->private_data;
