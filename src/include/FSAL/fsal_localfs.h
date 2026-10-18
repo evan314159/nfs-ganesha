@@ -83,7 +83,35 @@ struct fsal_filesystem {
 	bool trunc_verif; /*< true if the filesystem needs
 					    atime/mtime to be truncated to 31
 					    bits when storing verifier. */
+	uint64_t root_fileid; /*< fileid of the root of this file system */
+	uint64_t mounted_on_fileid; /*< inode number of the directory this file
+					system is mounted on, or 0 */
 };
+
+/**
+ * @brief Set the mounted_on_fileid attribute, if it was requested
+ *
+ * For the root of a file system, this is the inode number of the directory
+ * the file system is mounted on. For anything else, it is the fileid.
+ *
+ * @param[in]     fs     File system the object is in
+ * @param[in,out] attrs  Attributes of the object, with its fileid
+ */
+static inline void fsal_fs_set_mounted_on_fileid(struct fsal_filesystem *fs,
+						 struct fsal_attrlist *attrs)
+{
+	if (!FSAL_TEST_MASK(attrs->request_mask, ATTR4_MOUNTED_ON_FILEID) ||
+	    !FSAL_TEST_MASK(attrs->valid_mask, ATTR_FILEID))
+		return;
+
+	if (fs != NULL && fs->mounted_on_fileid != 0 &&
+	    attrs->fileid == fs->root_fileid)
+		attrs->mounted_on_fileid = fs->mounted_on_fileid;
+	else
+		attrs->mounted_on_fileid = attrs->fileid;
+
+	FSAL_SET_MASK(attrs->valid_mask, ATTR4_MOUNTED_ON_FILEID);
+}
 
 /*
  * Link fsal_filesystems and fsal_exports

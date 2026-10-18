@@ -198,6 +198,12 @@ fsal_status_t GPFSFSAL_getattrs(struct fsal_export *export,
 	st = gpfsfsal_xstat_2_fsal_attributes(&buffxstat, obj_attr, acl_buf,
 					      gpfs_export->use_acl);
 
+	/* As for VFS: the root of a file system mounted inside the export
+	 * gets the fileid of the directory it is mounted on.
+	 */
+	if (!FSAL_IS_ERROR(st))
+		fsal_fs_set_mounted_on_fileid(gpfs_fs->fs, obj_attr);
+
 error:
 	if (FSAL_IS_ERROR(st)) {
 		if (obj_attr->request_mask & ATTR_RDATTR_ERR) {

@@ -267,7 +267,8 @@ static struct bitmap4 proxyv4_bitmap_getattr = {
 		   PROXYV4_ATTR_BIT2(FATTR4_TIME_ACCESS) |
 		   PROXYV4_ATTR_BIT2(FATTR4_TIME_METADATA) |
 		   PROXYV4_ATTR_BIT2(FATTR4_TIME_MODIFY) |
-		   PROXYV4_ATTR_BIT2(FATTR4_RAWDEV)),
+		   PROXYV4_ATTR_BIT2(FATTR4_RAWDEV) |
+		   PROXYV4_ATTR_BIT2(FATTR4_MOUNTED_ON_FILEID)),
 	.bitmap4_len = 2
 };
 
@@ -1825,6 +1826,34 @@ static bool xdr_readdirres(XDR *x, nfs_resop4 *rdres)
 	return res;
 }
 
+/**
+ * @brief Convert attributes from the backend server to FSAL attributes
+ *
+ * As nfs4_Fattr_To_FSAL_attr(), except for mounted_on_fileid. PROXY_V4 asks
+ * the backend for it, so that the root of a file system mounted inside an
+ * export on the backend gets the fileid of the directory it is mounted on.
+ * A backend that doesn't return it gets fileid instead, which is what
+ * Ganesha returns for an FSAL that doesn't give mounted_on_fileid. Without
+ * that, MDCACHE would find mounted_on_fileid missing from every cached
+ * object, and fetch the attributes again each time it was asked for.
+ *
+ * @return NFS4_OK, or an error from nfs4_Fattr_To_FSAL_attr().
+ */
+static int proxyv4_fattr_to_attrs(struct fsal_attrlist *attrs, fattr4 *fattr,
+				  compound_data_t *data)
+{
+	int rc = nfs4_Fattr_To_FSAL_attr(attrs, fattr, data);
+
+	if (rc == NFS4_OK &&
+	    !FSAL_TEST_MASK(attrs->valid_mask, ATTR4_MOUNTED_ON_FILEID) &&
+	    FSAL_TEST_MASK(attrs->valid_mask, ATTR_FILEID)) {
+		attrs->mounted_on_fileid = attrs->fileid;
+		FSAL_SET_MASK(attrs->valid_mask, ATTR4_MOUNTED_ON_FILEID);
+	}
+
+	return rc;
+}
+
 /*
  * Trying to guess how many entries can fit into a readdir buffer
  * is complicated and usually results in either gross over-allocation
@@ -1878,7 +1907,7 @@ static fsal_status_t proxyv4_do_readdir(struct proxyv4_obj_handle *ph,
 		if (e4->name.utf8string_len > MAXNAMLEN)
 			return fsalstat(ERR_FSAL_SERVERFAULT, E2BIG);
 
-		if (nfs4_Fattr_To_FSAL_attr(&attrs, &e4->attrs, NULL))
+		if (proxyv4_fattr_to_attrs(&attrs, &e4->attrs, NULL))
 			return fsalstat(ERR_FSAL_FAULT, 0);
 
 		/*
@@ -1995,7 +2024,7 @@ static inline int nfs4_Fattr_To_FSAL_attr_savreqmask(
 	int rc = 0;
 	attrmask_t saved_request_mask = FSAL_attr->request_mask;
 
-	rc = nfs4_Fattr_To_FSAL_attr(FSAL_attr, Fattr, data);
+	rc = proxyv4_fattr_to_attrs(FSAL_attr, Fattr, data);
 	FSAL_attr->request_mask = saved_request_mask;
 	return rc;
 }
@@ -2080,7 +2109,7 @@ static fsal_status_t proxyv4_unlink(struct fsal_obj_handle *dir_hdl,
 		return nfsstat4_to_fsal(rc);
 
 #if GETATTR_AFTER
-	if (nfs4_Fattr_To_FSAL_attr(&dirattr, &atok->obj_attributes, NULL) ==
+	if (proxyv4_fattr_to_attrs(&dirattr, &atok->obj_attributes, NULL) ==
 	    NFS4_OK)
 		ph->attributes = dirattr;
 #endif
@@ -2508,8 +2537,8 @@ proxyv4_open2(struct fsal_obj_handle *obj_hdl, struct state_t *state,
 
 	/* set attrs_out if needed and not yet done by creating new object */
 	if (attrs_out && (!new_obj || (new_obj && !name))) {
-		rc = nfs4_Fattr_To_FSAL_attr(attrs_out, &atok->obj_attributes,
-					     NULL);
+		rc = proxyv4_fattr_to_attrs(attrs_out, &atok->obj_attributes,
+					    NULL);
 		if (rc != NFS4_OK)
 			return nfsstat4_to_fsal(rc);
 	}
@@ -2925,7 +2954,7 @@ proxyv4_alloc_handle(struct fsal_export *exp, const nfs_fh4 *fh,
 
 	data.current_obj = &n->obj;
 
-	if (nfs4_Fattr_To_FSAL_attr(&attributes, obj_attributes, &data) !=
+	if (proxyv4_fattr_to_attrs(&attributes, obj_attributes, &data) !=
 	    NFS4_OK) {
 		gsh_free(n, MEM_COMP_FSAL);
 		return NULL;

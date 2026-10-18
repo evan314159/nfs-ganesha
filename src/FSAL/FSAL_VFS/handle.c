@@ -458,6 +458,7 @@ static fsal_status_t lookup_with_fd(struct vfs_fsal_obj_handle *parent_hdl,
 		 * the device major/minor from stat.
 		 */
 		attrs_out->fsid = hdl->obj_handle.fs->fsid;
+		fsal_fs_set_mounted_on_fileid(hdl->obj_handle.fs, attrs_out);
 	}
 
 	hdl->obj_handle.fsid = hdl->obj_handle.fs->fsid;
@@ -710,6 +711,8 @@ static fsal_status_t makedir(struct fsal_obj_handle *dir_hdl, const char *name,
 			 * not be the device major/minor from stat.
 			 */
 			attrs_out->fsid = hdl->obj_handle.fs->fsid;
+			fsal_fs_set_mounted_on_fileid(hdl->obj_handle.fs,
+						      attrs_out);
 		}
 	}
 
@@ -926,6 +929,8 @@ static fsal_status_t makenode(struct fsal_obj_handle *dir_hdl, const char *name,
 			 * not be the device major/minor from stat.
 			 */
 			attrs_out->fsid = hdl->obj_handle.fs->fsid;
+			fsal_fs_set_mounted_on_fileid(hdl->obj_handle.fs,
+						      attrs_out);
 		}
 	}
 
@@ -1123,6 +1128,8 @@ static fsal_status_t makesymlink(struct fsal_obj_handle *dir_hdl,
 			 * not be the device major/minor from stat.
 			 */
 			attrs_out->fsid = hdl->obj_handle.fs->fsid;
+			fsal_fs_set_mounted_on_fileid(hdl->obj_handle.fs,
+						      attrs_out);
 		}
 	}
 
@@ -1489,6 +1496,16 @@ static fsal_status_t read_dirents(struct fsal_obj_handle *dir_hdl,
 
 				goto done;
 			}
+
+			/* This entry is a mount point: another file system is
+			 * mounted on it. readdir() gives the inode number of
+			 * the directory underneath, which is what
+			 * mounted_on_fileid must be (RFC 8881 5.8.2.23).
+			 */
+			if (FSAL_TEST_MASK(attrs.valid_mask,
+					   ATTR4_MOUNTED_ON_FILEID) &&
+			    hdl->fs != myself->obj_handle.fs)
+				attrs.mounted_on_fileid = dentryp->vd_ino;
 
 			/* callback to MDCACHE */
 			cb_rc = cb(dentryp->vd_name, hdl, &attrs, dir_state,
@@ -2076,6 +2093,7 @@ fsal_status_t vfs_lookup_path(struct fsal_export *exp_hdl, const char *path,
 		* not be the device major/minor from stat.
 		*/
 		attrs_out->fsid = hdl->obj_handle.fs->fsid;
+		fsal_fs_set_mounted_on_fileid(hdl->obj_handle.fs, attrs_out);
 	}
 
 	/* if it is a directory and the sticky bit is set
@@ -2305,6 +2323,7 @@ fsal_status_t vfs_create_handle(struct fsal_export *exp_hdl,
 		* not be the device major/minor from stat.
 		*/
 		attrs_out->fsid = hdl->obj_handle.fs->fsid;
+		fsal_fs_set_mounted_on_fileid(hdl->obj_handle.fs, attrs_out);
 	}
 
 	*handle = &hdl->obj_handle;

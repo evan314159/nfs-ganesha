@@ -311,6 +311,34 @@ retry:
 }
 
 /**
+ * @brief Get the mounted_on_fileid of the directory an export is mounted on
+ *
+ * @param[in] obj  The directory the export is mounted on
+ *
+ * @return The value from the FSAL if it gives one, else the fileid.
+ */
+static uint64_t junction_mounted_on_fileid(struct fsal_obj_handle *obj)
+{
+	struct fsal_attrlist attrs;
+	uint64_t mounted_on_fileid = obj->fileid;
+
+	if (!(op_ctx->fsal_export->exp_ops.fs_supported_attrs(
+		      op_ctx->fsal_export) &
+	      ATTR4_MOUNTED_ON_FILEID))
+		return mounted_on_fileid;
+
+	fsal_prepare_attrs(&attrs, ATTR4_MOUNTED_ON_FILEID);
+
+	if (FSAL_IS_SUCCESS(obj->obj_ops->getattrs(obj, &attrs)) &&
+	    FSAL_TEST_MASK(attrs.valid_mask, ATTR4_MOUNTED_ON_FILEID))
+		mounted_on_fileid = attrs.mounted_on_fileid;
+
+	fsal_release_attrs(&attrs);
+
+	return mounted_on_fileid;
+}
+
+/**
  * @brief  Mount an export in the new Pseudo FS.
  *
  * @param exp     [IN] export in question
@@ -320,6 +348,7 @@ retry:
 bool pseudo_mount_export(struct gsh_export *export)
 {
 	struct pseudofs_state state;
+	uint64_t mounted_on_fileid;
 	char *tmp_pseudopath;
 	char *last_slash;
 	char *p;
@@ -451,16 +480,21 @@ bool pseudo_mount_export(struct gsh_export *export)
 		}
 	}
 
-	/* Fill in the mounted on information for the export. */
+	/* Fill in the mounted on information for the export. If the export is
+	 * mounted on a real directory, that directory may itself be a mount
+	 * point.
+	 */
+	mounted_on_fileid = junction_mounted_on_fileid(state.obj);
+
 	PTHREAD_RWLOCK_wrlock(&export->exp_lock);
 
 	LogDebug(
 		COMPONENT_EXPORT,
 		"BUILDING PSEUDOFS: Export_Id %d Path %s Pseudo Path %s mounted_on_fileid %" PRIx64,
 		export->export_id, state.st_fullpath, state.st_pseudopath,
-		state.obj->fileid);
+		mounted_on_fileid);
 
-	export->exp_mounted_on_file_id = state.obj->fileid;
+	export->exp_mounted_on_file_id = mounted_on_fileid;
 
 	/* Get an active reference on the object */
 	state.obj->obj_ops->get_ref(state.obj);

@@ -49,12 +49,13 @@
 
 /* defined the set of attributes supported with POSIX */
 #ifndef ENABLE_VFS_ACL
-#define VFS_SUPPORTED_ATTRIBUTES \
-	((const attrmask_t)(ATTRS_POSIX | ATTR4_XATTR | ATTR4_FS_LOCATIONS))
+#define VFS_SUPPORTED_ATTRIBUTES                                    \
+	((const attrmask_t)(ATTRS_POSIX | ATTR4_XATTR | ATTR4_FS_LOCATIONS | \
+			    ATTR4_MOUNTED_ON_FILEID))
 #else
 #define VFS_SUPPORTED_ATTRIBUTES                                   \
 	((const attrmask_t)(ATTRS_POSIX | ATTR_ACL | ATTR4_XATTR | \
-			    ATTR4_FS_LOCATIONS))
+			    ATTR4_FS_LOCATIONS | ATTR4_MOUNTED_ON_FILEID))
 #endif
 
 const char myname[] = "@FSAL_LUSTRE_VFS_NAME@";

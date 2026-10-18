@@ -405,6 +405,8 @@ typedef uint64_t attrmask_t;
 #define ATTR4_XATTR 0x0000000001000000LL
 /* security labels supported */
 #define ATTR4_SEC_LABEL 0x0000000002000000LL
+/* mounted_on_fileid: differs from fileid only for the root of a file system */
+#define ATTR4_MOUNTED_ON_FILEID 0x0000000008000000LL
 
 /* attributes that used for NFS v3 */
 
@@ -474,6 +476,9 @@ struct fsal_attrlist {
 	fsal_fs_locations_t *fs_locations; /*< fs locations for this
 						    object if any */
 	struct sec_label4 sec_label;
+	uint64_t mounted_on_fileid; /*< Same as fileid, except for the root of
+					a file system: then the fileid of the
+					directory it is mounted on */
 };
 
 /******************************************************
