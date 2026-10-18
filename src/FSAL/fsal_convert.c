@@ -396,6 +396,8 @@ const char *object_file_type_to_str(object_file_type_t type)
 		return "DIRECTORY";
 	case EXTENDED_ATTR:
 		return "EXTENDED_ATTR";
+	case ATTR_DIRECTORY:
+		return "ATTR_DIRECTORY";
 	}
 	return "unexpected type";
 }

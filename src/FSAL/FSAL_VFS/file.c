@@ -344,6 +344,7 @@ static fsal_status_t fetch_attrs(struct vfs_fsal_obj_handle *myself, int my_fd,
 
 	case NO_FILE_TYPE:
 	case EXTENDED_ATTR:
+	case ATTR_DIRECTORY:
 		/* Caught during open with EINVAL */
 		break;
 	}
@@ -1189,6 +1190,7 @@ fsal_status_t find_fd(struct fsal_fd **out_fd, struct fsal_obj_handle *obj_hdl,
 
 	case NO_FILE_TYPE:
 	case EXTENDED_ATTR:
+	case ATTR_DIRECTORY:
 		return posix2fsal_status(EINVAL);
 	}
 

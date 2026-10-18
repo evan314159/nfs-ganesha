@@ -1145,6 +1145,7 @@ fsal_status_t fsal_create(struct fsal_obj_handle *parent, const char *name,
 
 	case NO_FILE_TYPE:
 	case EXTENDED_ATTR:
+	case ATTR_DIRECTORY:
 		/* we should never go there */
 		status = fsalstat(ERR_FSAL_BADTYPE, 0);
 		*obj = NULL;

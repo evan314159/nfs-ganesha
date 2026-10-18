@@ -59,7 +59,8 @@ typedef enum {
 	SOCKET_FILE = 5,
 	FIFO_FILE = 6,
 	DIRECTORY = 7,
-	EXTENDED_ATTR = 8
+	EXTENDED_ATTR = 8, /* An NFSv4 named attribute */
+	ATTR_DIRECTORY = 9 /* An NFSv4 named attribute directory */
 } object_file_type_t;
 
 /* ---------------
@@ -405,6 +406,8 @@ typedef uint64_t attrmask_t;
 #define ATTR4_XATTR 0x0000000001000000LL
 /* security labels supported */
 #define ATTR4_SEC_LABEL 0x0000000002000000LL
+/* object has named attributes */
+#define ATTR4_NAMED_ATTR 0x0000000004000000LL
 /* mounted_on_fileid: differs from fileid only for the root of a file system */
 #define ATTR4_MOUNTED_ON_FILEID 0x0000000008000000LL
 
@@ -476,6 +479,7 @@ struct fsal_attrlist {
 	fsal_fs_locations_t *fs_locations; /*< fs locations for this
 						    object if any */
 	struct sec_label4 sec_label;
+	bool named_attr; /*< Object has named attributes */
 	uint64_t mounted_on_fileid; /*< Same as fileid, except for the root of
 					a file system: then the fileid of the
 					directory it is mounted on */

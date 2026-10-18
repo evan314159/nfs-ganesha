@@ -118,7 +118,7 @@ fsal_status_t mdcache_alloc_and_check_handle(
 					   MDCACHE_TRUST_ATTRS);
 	}
 
-	if (get_readdir_mode() == FSAL_RDDIR_CHUNK_ALWAYS) {
+	if (mdc_readdir_mode(parent) == FSAL_RDDIR_CHUNK_ALWAYS) {
 		/* Add this entry to the directory (also takes an internal ref)
 		 */
 		if (!content_lock_held)
@@ -186,6 +186,66 @@ static fsal_status_t mdcache_lookup(struct fsal_obj_handle *parent,
 	status = mdc_lookup(mdc_parent, name, true, &entry, attrs_out);
 	if (entry)
 		*handle = &entry->obj_handle;
+
+	return status;
+}
+
+/**
+ * @brief Get the named attribute directory of an object
+ *
+ * The directory is not an entry of any cached directory: OPENATTR is the
+ * only way to reach it.
+ *
+ * @param[in]  obj_hdl    Object whose named attributes are wanted
+ * @param[in]  createdir  Create the directory if the object has none
+ * @param[out] attrdir    The named attribute directory
+ * @param[out] attrs_out  Optional attributes of the directory
+ *
+ * @note This returns an INITIAL ref'd entry on success
+ * @return FSAL status
+ */
+static fsal_status_t mdcache_openattr(struct fsal_obj_handle *obj_hdl,
+				      bool createdir,
+				      struct fsal_obj_handle **attrdir,
+				      struct fsal_attrlist *attrs_out)
+{
+	mdcache_entry_t *entry =
+		container_of(obj_hdl, mdcache_entry_t, obj_handle);
+	struct mdcache_fsal_export *export = mdc_cur_export();
+	struct fsal_obj_handle *sub_handle = NULL;
+	mdcache_entry_t *new_entry = NULL;
+	struct fsal_attrlist attrs;
+	fsal_status_t status;
+
+	*attrdir = NULL;
+
+	fsal_prepare_attrs(&attrs,
+			   op_ctx->fsal_export->exp_ops.fs_supported_attrs(
+				   op_ctx->fsal_export) &
+				   ~ATTR_ACL);
+
+	subcall(status = entry->sub_handle->obj_ops->openattr(
+			entry->sub_handle, createdir, &sub_handle, &attrs));
+
+	if (!FSAL_IS_ERROR(status)) {
+		status = mdcache_new_entry(export, sub_handle, &attrs, false,
+					   attrs_out, false, &new_entry, NULL,
+					   LRU_ACTIVE_REF | LRU_PROMOTE, NULL,
+					   NULL);
+	}
+
+	fsal_release_attrs(&attrs);
+
+	if (!FSAL_IS_ERROR(status) && createdir) {
+		/* Creating the directory can change the object's attributes
+		 * (named_attr, ctime), so refresh them.
+		 */
+		atomic_clear_uint32_t_bits(&entry->mde_flags,
+					   MDCACHE_TRUST_ATTRS);
+	}
+
+	if (!FSAL_IS_ERROR(status))
+		*attrdir = &new_entry->obj_handle;
 
 	return status;
 }
@@ -505,7 +565,7 @@ static fsal_status_t mdcache_link(struct fsal_obj_handle *obj_hdl,
 		return status;
 	}
 
-	if (get_readdir_mode() == FSAL_RDDIR_CHUNK_ALWAYS) {
+	if (mdc_readdir_mode(dest) == FSAL_RDDIR_CHUNK_ALWAYS) {
 		PTHREAD_RWLOCK_wrlock(&dest->content_lock);
 
 		/* Add this entry to the directory (also takes an internal ref)
@@ -561,7 +621,7 @@ static fsal_status_t mdcache_readdir(struct fsal_obj_handle *dir_hdl,
 {
 	mdcache_entry_t *directory =
 		container_of(dir_hdl, mdcache_entry_t, obj_handle);
-	enum fsal_readdir_mode dirmode = get_readdir_mode();
+	enum fsal_readdir_mode dirmode = mdc_readdir_mode(directory);
 
 	if (!(directory->obj_handle.type == DIRECTORY))
 		return fsalstat(ERR_FSAL_NOTDIR, 0);
@@ -777,7 +837,7 @@ static fsal_status_t mdcache_rename(struct fsal_obj_handle *obj_hdl,
 		/* Handle key is changing.  This means the old handle is
 		 * useless.  Mark it unreachable, forcing a lookup next time */
 		mdc_unreachable(mdc_obj);
-	} else if (get_readdir_mode() == FSAL_RDDIR_CHUNK_ALWAYS) {
+	} else if (mdc_readdir_mode(mdc_newdir) == FSAL_RDDIR_CHUNK_ALWAYS) {
 		bool invalidate = true;
 
 		LogDebug(COMPONENT_MDCACHE,
@@ -1622,6 +1682,7 @@ void mdcache_handle_ops_init(struct fsal_obj_ops *ops)
 	ops->listxattrs = mdcache_listxattrs;
 
 	ops->is_referral = mdcache_is_referral;
+	ops->openattr = mdcache_openattr;
 }
 
 /*

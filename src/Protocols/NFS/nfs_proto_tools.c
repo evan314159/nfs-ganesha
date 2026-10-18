@@ -439,11 +439,16 @@ static fattr_xdr_result encode_type(XDR *xdr, struct xdr_attrs_args *args)
 
 	switch (args->attrs->type) {
 	case REGULAR_FILE:
-	case EXTENDED_ATTR:
 		file_type = NF4REG; /* Regular file */
+		break;
+	case EXTENDED_ATTR:
+		file_type = NF4NAMEDATTR; /* Named attribute */
 		break;
 	case DIRECTORY:
 		file_type = NF4DIR; /* Directory */
+		break;
+	case ATTR_DIRECTORY:
+		file_type = NF4ATTRDIR; /* Named attribute directory */
 		break;
 	case BLOCK_FILE:
 		file_type = NF4BLK; /* Special File - block device */
@@ -495,6 +500,12 @@ static fattr_xdr_result decode_type(XDR *xdr, struct xdr_attrs_args *args)
 		break;
 	case NF4FIFO:
 		args->attrs->type = FIFO_FILE;
+		break;
+	case NF4ATTRDIR:
+		args->attrs->type = ATTR_DIRECTORY;
+		break;
+	case NF4NAMEDATTR:
+		args->attrs->type = EXTENDED_ATTR;
 		break;
 	default:
 		/* For wanting of a better solution */
@@ -618,7 +629,9 @@ static fattr_xdr_result decode_symlinksupport(XDR *xdr,
  * FATTR4_NAMED_ATTR
  */
 
-/* For this version of the binary, named attributes is not supported */
+/* Whether the object has named attributes. For an FSAL that doesn't report
+ * it per object, whether the filesystem supports them, as before.
+ */
 
 static fattr_xdr_result encode_namedattrsupport(XDR *xdr,
 						struct xdr_attrs_args *args)
@@ -626,7 +639,9 @@ static fattr_xdr_result encode_namedattrsupport(XDR *xdr,
 	struct fsal_export *export;
 	bool_t namedattrsupport = FALSE;
 
-	if (args->data != NULL) {
+	if (FSAL_TEST_MASK(args->attrs->valid_mask, ATTR4_NAMED_ATTR)) {
+		namedattrsupport = args->attrs->named_attr;
+	} else if (args->data != NULL) {
 		export = op_ctx->fsal_export;
 		namedattrsupport =
 			export->exp_ops.fs_supports(export, fso_named_attr);
@@ -3723,6 +3738,34 @@ void nfs4_Fattr_Free(fattr4 *fattr)
 		fattr->attr_vals.attrlist4_val = NULL;
 		fattr->attr_vals.attrlist4_len = 0;
 	}
+}
+
+/**
+ * @brief Get the NFSv4 type of an object
+ *
+ * This is obj->type, except for named attributes and their directories: their
+ * obj->type is REGULAR_FILE and DIRECTORY, so the rest of Ganesha handles them
+ * as files and directories, and only their attributes have the real types,
+ * EXTENDED_ATTR and ATTR_DIRECTORY.
+ *
+ * @param[in] obj  The object
+ *
+ * @return Its type.
+ */
+object_file_type_t nfs4_object_type(struct fsal_obj_handle *obj)
+{
+	struct fsal_attrlist attrs;
+	object_file_type_t type = obj->type;
+
+	fsal_prepare_attrs(&attrs, ATTR_TYPE);
+
+	if (FSAL_IS_SUCCESS(obj->obj_ops->getattrs(obj, &attrs)) &&
+	    FSAL_TEST_MASK(attrs.valid_mask, ATTR_TYPE))
+		type = attrs.type;
+
+	fsal_release_attrs(&attrs);
+
+	return type;
 }
 
 /**
