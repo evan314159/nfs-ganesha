@@ -116,6 +116,12 @@ macOS_quirk_named_attr_NVERIFY(bool, default false)
     of a named attribute fails with NFS4ERR_NOTSUPP, so macOS reads the
     value normally.
 
+macOS_quirk_named_attr_truncate(bool, default false)
+    Works around a macOS bug: when it overwrites an existing extended
+    attribute, macOS forgets to truncate it, so a shorter value leaves the
+    end of the old one. When set, opening a named attribute for writing
+    truncates it, except com.apple.ResourceFork.
+
 The macOS quirks are not standard NFS behaviour. They exist only if Ganesha
 is built with the CMake option USE_MACOS_QUIRKS, which is off by default,
 and can only be set in CLIENT blocks. By default they apply only to macOS

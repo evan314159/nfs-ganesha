@@ -494,6 +494,7 @@ EXPORT_DEFAULTS { CLIENT  {} }
 					     any], default [any])
 
 	macOS_quirk_named_attr_NVERIFY(bool, default false)
+	macOS_quirk_named_attr_truncate(bool, default false)
 		* macOS client workarounds; see ganesha-export-config(8).
 
 	Clients(client list, empty)
