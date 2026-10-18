@@ -184,6 +184,10 @@ enum nfs_req_result nfs4_op_sequence(struct nfs_argop4 *op,
 	}
 
 	data->preserved_clientid = session->clientid_record;
+#ifdef USE_MACOS_QUIRKS
+	/* @todo Remove with the last macOS quirk. */
+	op_ctx->client_is_macos = session->clientid_record->cid_macos;
+#endif
 
 	/* Take a reference on the clientid to prevent it from being freed
 	 * during compound execution.

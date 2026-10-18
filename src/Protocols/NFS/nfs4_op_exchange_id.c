@@ -63,6 +63,43 @@
 	 STATE_PROTECT4_R_BASE_SIZE + sizeof(uint64_t) +                   \
 	 3 * BYTES_PER_XDR_UNIT)
 
+#ifdef USE_MACOS_QUIRKS
+/**
+ * @brief Whether the client says it is macOS
+ *
+ * The macOS client gives apple.com as the domain of its implementation ID
+ * (RFC 8881 18.35.3), and its kernel version as the name. Workarounds for
+ * macOS client bugs can be limited to these clients.
+ *
+ * @todo Remove with the last macOS quirk.
+ *
+ * @param[in] args  Arguments to EXCHANGE_ID
+ *
+ * @return true if the client is macOS.
+ */
+static bool client_impl_is_macos(const EXCHANGE_ID4args *args)
+{
+	const nfs_impl_id4 *impl;
+	static const char apple[] = "apple.com";
+
+	if (args->eia_client_impl_id.eia_client_impl_id_len == 0)
+		return false;
+
+	impl = args->eia_client_impl_id.eia_client_impl_id_val;
+
+	LogDebug(COMPONENT_CLIENTID,
+		 "EXCHANGE_ID client implementation domain %.*s name %.*s",
+		 (int)impl->nii_domain.utf8string_len,
+		 impl->nii_domain.utf8string_val,
+		 (int)impl->nii_name.utf8string_len,
+		 impl->nii_name.utf8string_val);
+
+	return impl->nii_domain.utf8string_len == sizeof(apple) - 1 &&
+	       strncasecmp(impl->nii_domain.utf8string_val, apple,
+			   sizeof(apple) - 1) == 0;
+}
+#endif /* USE_MACOS_QUIRKS */
+
 /**
  * @brief The NFS4_OP_EXCHANGE_ID operation
  *
@@ -374,6 +411,11 @@ enum nfs_req_result nfs4_op_exchange_id(struct nfs_argop4 *op,
 	 * always uses SP4_NONE
 	 */
 	unconf->cid_state_protect_how = SP4_NONE;
+
+#ifdef USE_MACOS_QUIRKS
+	/* @todo Remove with the last macOS quirk. */
+	unconf->cid_macos = client_impl_is_macos(arg_EXCHANGE_ID4);
+#endif
 
 	rc = nfs_client_id_insert(unconf);
 

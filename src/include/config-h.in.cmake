@@ -129,6 +129,7 @@
 #cmakedefine USE_BTRFSUTIL 1
 #cmakedefine USE_MONITORING 1
 #cmakedefine USE_GRPC 1
+#cmakedefine USE_MACOS_QUIRKS 1
 #cmakedefine USE_PRIO_INHERIT 1
 #cmakedefine LEGACY_METRICS 1
 #define NFS_GANESHA 1

@@ -334,6 +334,10 @@ option(USE_CB_SIMULATOR "enable callback simulator thread" OFF)
 # Build GRPC with ganesha
 goption(USE_GRPC "enable gRPC protocol support" OFF)
 
+# Workarounds for bugs in the macOS NFS client. Each one must also be turned
+# on in the config.
+option(USE_MACOS_QUIRKS "build workarounds for macOS NFS client bugs" OFF)
+
 goption(USE_NFSIDMAP "Use of libnfsidmap for name resolution" ON)
 option(ENABLE_ERROR_INJECTION "enable error injection" OFF)
 goption(ENABLE_VFS_POSIX_ACL "Enable NFSv4 to POSIX ACL mapping for VFS" OFF)
@@ -1553,6 +1557,7 @@ message(STATUS "USE_SYSTEM_NTIRPC = ${USE_SYSTEM_NTIRPC}")
 message(STATUS "USE_DBUS = ${USE_DBUS}")
 message(STATUS "USE_GRPC = ${USE_GRPC}")
 message(STATUS "USE_CB_SIMULATOR = ${USE_CB_SIMULATOR}")
+message(STATUS "USE_MACOS_QUIRKS = ${USE_MACOS_QUIRKS}")
 message(STATUS "USE_BTRFSUTIL = ${USE_BTRFSUTIL}")
 message(STATUS "USE_NFSIDMAP = ${USE_NFSIDMAP}")
 message(STATUS "USE_RELATIVE_FILE_PATHS_IN_LOGS = ${USE_RELATIVE_FILE_PATHS_IN_LOGS}")

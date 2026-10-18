@@ -518,6 +518,11 @@ struct req_op_context {
 	} flags;
 	bool export_conditional_log; /* conditional log enable for export */
 	bool client_conditional_log; /* conditional log enable for client */
+#ifdef USE_MACOS_QUIRKS
+	/* @todo Remove with the last macOS quirk. */
+	bool client_is_macos; /*< The request came on an NFSv4.1 session of
+				  a client that identified itself as macOS */
+#endif
 };
 
 /**
