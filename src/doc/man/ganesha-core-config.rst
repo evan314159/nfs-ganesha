@@ -572,6 +572,13 @@ Allow_Numeric_Owners(bool, default true)
 Only_Numeric_Owners(bool, default false)
     Whether to ONLY use bare numeric IDs in NFSv4 owner and group identifiers.
 
+macOS_quirks_only_for_macOS_clients(bool, default true)
+    When true, the macOS quirks in CLIENT blocks apply only to clients that
+    send apple.com in EXCHANGE_ID. Set it to false if all clients are Macs
+    and some use NFS versions prior to NFSv4.1. This option and the macOS
+    quirks exist only if Ganesha is built with the CMake option
+    USE_MACOS_QUIRKS, which is off by default.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 

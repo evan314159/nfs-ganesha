@@ -3568,6 +3568,32 @@ void set_op_context_export(struct gsh_export *exp)
 	set_op_context_export_fsal_no_release(exp, fsal_exp, NULL);
 }
 
+#ifdef USE_MACOS_QUIRKS
+/**
+ * @brief Whether a workaround for a macOS client bug applies to this request
+ *
+ * A macOS quirk set in the client's CLIENT block applies only if the client
+ * identified itself as macOS in EXCHANGE_ID, unless
+ * macOS_quirks_only_for_macOS_clients is turned off.
+ *
+ * @todo Remove with the last macOS quirk.
+ *
+ * @param[in] enabled  Whether the client's CLIENT block sets the quirk
+ *
+ * @return true if it applies.
+ */
+bool macos_quirk_applies(bool enabled)
+{
+	if (!enabled)
+		return false;
+
+	if (!nfs_param.nfsv4_param.macos_quirks_only_for_macos_clients)
+		return true;
+
+	return op_ctx != NULL && op_ctx->client_is_macos;
+}
+#endif /* USE_MACOS_QUIRKS */
+
 /**
  * @brief Set a client into the op_context.
  *

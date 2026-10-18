@@ -315,6 +315,13 @@ NFSV4 {}
 
 	Only_Numeric_Owners(bool, default false)
 
+	macOS_quirks_only_for_macOS_clients(bool, default true)
+		* When true, the quirks apply only to macOS clients using
+		  NFSv4.1 or later. Set false if all clients are Macs and
+		  some use NFS versions prior to NFSv4.1.
+		* Only in builds with the CMake option USE_MACOS_QUIRKS,
+		  which is off by default; likewise the macOS quirks.
+
 	Delegations(bool, default false)
 
 	Deleg_Recall_Retry_Delay(uint32_t, range 0 to 10, default 1)

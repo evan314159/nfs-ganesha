@@ -89,6 +89,11 @@ extern struct fsal_module *pnfs_fsal[];
  */
 extern struct config_item_list deleg_types[];
 
+#ifdef USE_MACOS_QUIRKS
+/* @todo Remove with the last macOS quirk. */
+bool macos_quirk_applies(bool enabled);
+#endif
+
 /* Export permissions for root op context, defined in protocol layer */
 extern uint32_t root_op_export_options;
 extern uint32_t root_op_export_set;
