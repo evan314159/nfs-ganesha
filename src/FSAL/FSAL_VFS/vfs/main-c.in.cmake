@@ -105,6 +105,8 @@ static struct config_item vfs_params[] = {
 	CONF_ITEM_BOOL("auth_xdev_export", false, vfs_fsal_module,
 		       module.fs_info.auth_exportpath_xdev),
 	CONF_ITEM_BOOL("only_one_user", false, vfs_fsal_module, only_one_user),
+	CONF_ITEM_BOOL("notify_local_changes", false, vfs_fsal_module,
+		       notify_local_changes),
 	CONFIG_EOL
 };
 

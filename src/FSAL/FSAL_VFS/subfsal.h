@@ -47,6 +47,15 @@ void vfs_sub_init_export_ops(struct vfs_fsal_export *myself,
 int vfs_sub_init_export(struct vfs_fsal_export *myself);
 
 /**
+ * @brief Called when a file system is claimed, with the fd of its root,
+ *        and when its last export unclaims it
+ */
+void vfs_sub_claim_filesystem(struct fsal_filesystem *fs,
+			      struct fsal_export *exp, int root_fd);
+
+void vfs_sub_unclaim_filesystem(struct fsal_filesystem *fs);
+
+/**
  * @brief Allocate the SubFSAL object handle
  *
  * Allocate the SubFSAL object handle.  It must be large enough to hold a
@@ -60,4 +69,6 @@ struct vfs_fsal_obj_handle *vfs_sub_alloc_handle(void);
 
 int vfs_sub_init_handle(struct vfs_fsal_export *myself,
 			struct vfs_fsal_obj_handle *hdl, const char *path);
+
+void vfs_sub_free_handle(struct vfs_fsal_obj_handle *hdl);
 #endif /* SUBFSAL_H */

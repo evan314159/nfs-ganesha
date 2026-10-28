@@ -47,6 +47,7 @@ struct vfs_fsal_module {
 	struct fsal_module module;
 	struct fsal_obj_ops handle_ops;
 	bool only_one_user;
+	bool notify_local_changes;
 };
 
 /*
@@ -170,6 +171,7 @@ struct vfs_fsal_obj_handle {
 #endif
 	struct vfs_subfsal_obj_ops *sub_ops; /*< Optional subfsal ops */
 	const struct fsal_up_vector *up_ops; /*< Upcall operations */
+	bool fanotify_watched; /*< Counted in vfs/fanotify.c */
 	union {
 		struct {
 			struct fsal_share share;
@@ -194,6 +196,22 @@ int vfs_fd_to_handle(int fd, struct fsal_filesystem *fs, vfs_file_handle_t *fh);
 
 int vfs_name_to_handle(int atfd, struct fsal_filesystem *fs, const char *name,
 		       vfs_file_handle_t *fh);
+
+#ifdef LINUX
+int vfs_kernel_to_handle(struct fsal_filesystem *fs,
+			 const struct file_handle *kernel_fh,
+			 vfs_file_handle_t *fh);
+#endif
+
+/* Upcalls for changes made outside Ganesha (vfs/fanotify.c) */
+void vfs_fanotify_claim(struct fsal_filesystem *fs, struct fsal_export *exp,
+			int root_fd);
+
+void vfs_fanotify_unclaim(struct fsal_filesystem *fs);
+
+void vfs_fanotify_watch_handle(struct vfs_fsal_obj_handle *hdl);
+
+void vfs_fanotify_unwatch_handle(struct vfs_fsal_obj_handle *hdl);
 
 int vfs_open_by_handle(struct fsal_filesystem *fs, vfs_file_handle_t *fh,
 		       int openflags, fsal_errors_t *fsal_error);

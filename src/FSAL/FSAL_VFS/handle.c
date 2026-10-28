@@ -93,6 +93,8 @@ void free_vfs_fsal_obj_handle(struct vfs_fsal_obj_handle **hdl_ref)
 	struct vfs_fsal_obj_handle *myself = *hdl_ref;
 	object_file_type_t type = myself->obj_handle.type;
 
+	vfs_sub_free_handle(myself);
+
 	if (type == SYMBOLIC_LINK) {
 		gsh_free(myself->u.symlink.link_content, MEM_COMP_FSAL);
 	} else if (type == REGULAR_FILE) {

@@ -132,6 +132,7 @@
   foreach_gsh_export;
   getfhat;
   get_fs_first_export_ref;
+  get_fsid_first_export_ref;
   get_gsh_export;
   get_optional_attrs;
   general_fridge;

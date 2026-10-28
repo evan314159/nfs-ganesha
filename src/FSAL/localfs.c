@@ -1325,13 +1325,14 @@ void unclaim_all_filesystem_maps(struct fsal_filesystem *this)
 	}
 }
 
-void get_fs_first_export_ref(struct fsal_filesystem *this,
-			     struct gsh_export **gsh_export,
-			     struct fsal_export **fsal_export)
+/**
+ * @note Must hold fs_lock
+ */
+static void get_fs_first_export_ref_locked(struct fsal_filesystem *this,
+					   struct gsh_export **gsh_export,
+					   struct fsal_export **fsal_export)
 {
 	struct fsal_filesystem_export_map *map;
-
-	PTHREAD_RWLOCK_wrlock(&fs_lock);
 
 	map = glist_first_entry(&this->exports,
 				struct fsal_filesystem_export_map, on_exports);
@@ -1340,6 +1341,47 @@ void get_fs_first_export_ref(struct fsal_filesystem *this,
 		*fsal_export = map->exp;
 		*gsh_export = (*fsal_export)->owning_export;
 		get_gsh_export_ref(*gsh_export);
+	} else {
+		*gsh_export = NULL;
+		*fsal_export = NULL;
+	}
+}
+
+void get_fs_first_export_ref(struct fsal_filesystem *this,
+			     struct gsh_export **gsh_export,
+			     struct fsal_export **fsal_export)
+{
+	PTHREAD_RWLOCK_wrlock(&fs_lock);
+
+	get_fs_first_export_ref_locked(this, gsh_export, fsal_export);
+
+	PTHREAD_RWLOCK_unlock(&fs_lock);
+}
+
+/**
+ * @brief Get a reference to the first export of the file system with an fsid
+ *
+ * Unlike get_fs_first_export_ref(), the caller needs no pointer to the file
+ * system, which may be released once it is unclaimed.
+ *
+ * @param[in]  fsid        The file system's fsid
+ * @param[in]  fsid_type   The type of fsid
+ * @param[out] gsh_export  The export, with a reference, or NULL
+ * @param[out] fsal_export The FSAL export, or NULL
+ */
+void get_fsid_first_export_ref(struct fsal_fsid__ *fsid,
+			       enum fsid_type fsid_type,
+			       struct gsh_export **gsh_export,
+			       struct fsal_export **fsal_export)
+{
+	struct fsal_filesystem *fs;
+
+	PTHREAD_RWLOCK_rdlock(&fs_lock);
+
+	fs = lookup_fsid_locked(fsid, fsid_type);
+
+	if (fs != NULL) {
+		get_fs_first_export_ref_locked(fs, gsh_export, fsal_export);
 	} else {
 		*gsh_export = NULL;
 		*fsal_export = NULL;
