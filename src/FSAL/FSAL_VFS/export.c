@@ -382,6 +382,8 @@ int vfs_claim_filesystem(struct fsal_filesystem *fs, struct fsal_export *exp,
 		 "claiming file system %s fd %d (private_data %p)", fs->path,
 		 fd, *private_data);
 
+	vfs_sub_claim_filesystem(fs, exp, fd);
+
 errout:
 
 	return retval;
@@ -390,6 +392,8 @@ errout:
 void vfs_unclaim_filesystem(struct fsal_filesystem *fs)
 {
 	LogFilesystem("VFS UNCLAIM FS", "", fs);
+
+	vfs_sub_unclaim_filesystem(fs);
 
 	if (root_fd(fs) > 0)
 		close(root_fd(fs));

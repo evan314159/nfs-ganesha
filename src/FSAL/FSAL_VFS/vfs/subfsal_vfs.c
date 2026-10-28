@@ -89,6 +89,17 @@ int vfs_sub_init_export(struct vfs_fsal_export *myself)
 	return 0;
 }
 
+void vfs_sub_claim_filesystem(struct fsal_filesystem *fs,
+			      struct fsal_export *exp, int root_fd)
+{
+	vfs_fanotify_claim(fs, exp, root_fd);
+}
+
+void vfs_sub_unclaim_filesystem(struct fsal_filesystem *fs)
+{
+	vfs_fanotify_unclaim(fs);
+}
+
 struct vfs_fsal_obj_handle *vfs_sub_alloc_handle(void)
 {
 	struct vfs_fsal_obj_handle *hdl;
@@ -112,5 +123,11 @@ int vfs_sub_init_handle(struct vfs_fsal_export *myself,
 			struct vfs_fsal_obj_handle *hdl, const char *path)
 {
 	hdl->sub_ops = &vfs_obj_subops;
+	vfs_fanotify_watch_handle(hdl);
 	return 0;
+}
+
+void vfs_sub_free_handle(struct vfs_fsal_obj_handle *hdl)
+{
+	vfs_fanotify_unwatch_handle(hdl);
 }
