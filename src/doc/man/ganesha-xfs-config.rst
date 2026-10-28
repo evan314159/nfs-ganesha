@@ -46,6 +46,9 @@ XFS {}
 **named_attr(bool, default false)**
     As for VFS: see :doc:`ganesha-vfs-config <ganesha-vfs-config>`\(8).
 
+FSAL_XFS doesn't support VFS's notify_local_changes: its file handles are
+not the kernel's, which fanotify reports.
+
 See also
 ==============================
 :doc:`ganesha-log-config <ganesha-log-config>`\(8)

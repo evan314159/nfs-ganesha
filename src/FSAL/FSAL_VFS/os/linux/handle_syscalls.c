@@ -170,29 +170,26 @@ int display_vfs_handle(struct display_buffer *dspbuf,
 	} while (0)
 /* clang-format on */
 
-int vfs_map_name_to_handle_at(int fd, struct fsal_filesystem *fs,
-			      const char *path, vfs_file_handle_t *fh,
-			      int flags)
+/**
+ * @brief Make a VFS handle from a kernel file handle
+ *
+ * The kernel handle can come from name_to_handle_at() or from a fanotify
+ * event. The kernel gives the same handle both ways, so both give the same
+ * VFS handle.
+ *
+ * @param[in]  fs         File system of the object
+ * @param[in]  kernel_fh  The kernel's handle
+ * @param[out] fh         The VFS handle
+ *
+ * @return 0, or a negative value with errno set if the fsid or the handle
+ *         doesn't fit.
+ */
+int vfs_kernel_to_handle(struct fsal_filesystem *fs,
+			 const struct file_handle *kernel_fh,
+			 vfs_file_handle_t *fh)
 {
-	struct file_handle *kernel_fh;
 	int32_t i32;
 	int rc;
-	int mnt_id;
-
-	kernel_fh = alloca(sizeof(struct file_handle) + VFS_MAX_HANDLE);
-
-	kernel_fh->handle_bytes = VFS_MAX_HANDLE;
-
-	rc = name_to_handle_at(fd, path, kernel_fh, &mnt_id, flags);
-
-	if (rc < 0) {
-		int err = errno;
-
-		LogDebug(COMPONENT_FSAL, "Error %s (%d) bytes = %d",
-			 strerror(err), err, (int)kernel_fh->handle_bytes);
-		errno = err;
-		return rc;
-	}
 
 	/* Init flags with fsid type */
 	fh->handle_data[0] = fs->fsid_type;
@@ -252,6 +249,32 @@ bool vfs_supports_special_file_handles(void)
 {
 	/* O_PATH opens the inode without opening the socket or device. */
 	return true;
+}
+
+int vfs_map_name_to_handle_at(int fd, struct fsal_filesystem *fs,
+			      const char *path, vfs_file_handle_t *fh,
+			      int flags)
+{
+	struct file_handle *kernel_fh;
+	int rc;
+	int mnt_id;
+
+	kernel_fh = alloca(sizeof(struct file_handle) + VFS_MAX_HANDLE);
+
+	kernel_fh->handle_bytes = VFS_MAX_HANDLE;
+
+	rc = name_to_handle_at(fd, path, kernel_fh, &mnt_id, flags);
+
+	if (rc < 0) {
+		int err = errno;
+
+		LogDebug(COMPONENT_FSAL, "Error %s (%d) bytes = %d",
+			 strerror(err), err, (int)kernel_fh->handle_bytes);
+		errno = err;
+		return rc;
+	}
+
+	return vfs_kernel_to_handle(fs, kernel_fh, fh);
 }
 
 int vfs_open_by_handle(struct fsal_filesystem *fs, vfs_file_handle_t *fh,
