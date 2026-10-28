@@ -63,6 +63,15 @@ macOS clients also need macOS_quirk_named_attr_NVERIFY and
 macOS_quirk_named_attr_truncate in CLIENT blocks: see
 :doc:`ganesha-export-config <ganesha-export-config>`\(8).
 
+**notify_local_changes(bool, default false)**
+    Linux only. Watch each directory Ganesha has cached with fanotify, and
+    drop cached attributes and directory entries of objects that processes
+    other than Ganesha change in it, instead of serving them until they
+    expire. Covers every file system under the export that Ganesha reaches,
+    such as nested ZFS datasets. Needs Linux 5.13 or later, and no extra
+    capability. Each watched directory uses one fanotify mark, up to
+    fs.fanotify.max_user_marks; directories beyond that are not watched.
+
 See also
 ==============================
 :doc:`ganesha-log-config <ganesha-log-config>`\(8)

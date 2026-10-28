@@ -1305,6 +1305,12 @@ VFS {}
 		* NFSv4 named attributes, stored as "user." extended
 		  attributes. Linux only; see ganesha-vfs-config(8).
 
+	notify_local_changes(bool, default false)
+		Linux only. Watch cached directories with fanotify, and
+		drop cached objects that other processes change. Needs
+		Linux 5.13 or later. Each directory uses one fanotify mark,
+		up to fs.fanotify.max_user_marks.
+
 XFS {}
 ------
 

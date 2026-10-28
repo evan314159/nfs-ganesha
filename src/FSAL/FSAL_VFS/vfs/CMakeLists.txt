@@ -35,6 +35,7 @@ SET(fsalvfs_LIB_SRCS_common
    ../subfsal_helpers.c
    subfsal_vfs.c
    attrs.c
+   fanotify.c
 )
 
 set(fsalvfs_OBJS

@@ -170,29 +170,12 @@ int display_vfs_handle(struct display_buffer *dspbuf,
 	} while (0)
 /* clang-format on */
 
-int vfs_map_name_to_handle_at(int fd, struct fsal_filesystem *fs,
-			      const char *path, vfs_file_handle_t *fh,
-			      int flags)
+int vfs_kernel_to_handle(struct fsal_filesystem *fs,
+			 const struct file_handle *kernel_fh,
+			 vfs_file_handle_t *fh)
 {
-	struct file_handle *kernel_fh;
 	int32_t i32;
 	int rc;
-	int mnt_id;
-
-	kernel_fh = alloca(sizeof(struct file_handle) + VFS_MAX_HANDLE);
-
-	kernel_fh->handle_bytes = VFS_MAX_HANDLE;
-
-	rc = name_to_handle_at(fd, path, kernel_fh, &mnt_id, flags);
-
-	if (rc < 0) {
-		int err = errno;
-
-		LogDebug(COMPONENT_FSAL, "Error %s (%d) bytes = %d",
-			 strerror(err), err, (int)kernel_fh->handle_bytes);
-		errno = err;
-		return rc;
-	}
 
 	/* Init flags with fsid type */
 	fh->handle_data[0] = fs->fsid_type;
@@ -246,6 +229,32 @@ int vfs_map_name_to_handle_at(int fd, struct fsal_filesystem *fs,
 	LogVFSHandle(fh);
 
 	return 0;
+}
+
+int vfs_map_name_to_handle_at(int fd, struct fsal_filesystem *fs,
+			      const char *path, vfs_file_handle_t *fh,
+			      int flags)
+{
+	struct file_handle *kernel_fh;
+	int rc;
+	int mnt_id;
+
+	kernel_fh = alloca(sizeof(struct file_handle) + VFS_MAX_HANDLE);
+
+	kernel_fh->handle_bytes = VFS_MAX_HANDLE;
+
+	rc = name_to_handle_at(fd, path, kernel_fh, &mnt_id, flags);
+
+	if (rc < 0) {
+		int err = errno;
+
+		LogDebug(COMPONENT_FSAL, "Error %s (%d) bytes = %d",
+			 strerror(err), err, (int)kernel_fh->handle_bytes);
+		errno = err;
+		return rc;
+	}
+
+	return vfs_kernel_to_handle(fs, kernel_fh, fh);
 }
 
 int vfs_open_by_handle(struct fsal_filesystem *fs, vfs_file_handle_t *fh,
