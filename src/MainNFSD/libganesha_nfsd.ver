@@ -306,6 +306,7 @@
   update_export;
   update_share_counters;
   up_async_delegrecall;
+  up_async_invalidate;
   up_ready_cancel;
   up_ready_wait;
   vfs_readents;
