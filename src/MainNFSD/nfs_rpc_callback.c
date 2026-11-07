@@ -1293,16 +1293,26 @@ retry:
 /**
  * @brief Release a reserved callback slot and wake waiters
  *
- * @param[in,out] session The session holding slot to release
- * @param[in]     slot    Slot to release
- * @param[in]     bool    Whether the operation was ever sent
+ * find_cb_slot() advanced the slot's sequence ID for the call. RFC 8881
+ * section 2.10.6.1 has it advance only when the replier has processed the
+ * request, that is, when its CB_SEQUENCE succeeded. Otherwise (the call was
+ * not sent, got no reply, or the client answered NFS4ERR_SEQ_MISORDERED or
+ * another CB_SEQUENCE error) we put it back, or every later callback on the
+ * slot is misordered and callbacks to the client stop working for good. If
+ * the client did process a call whose reply was lost, the next call on the
+ * slot is a retry to it and gets the cached reply.
+ *
+ * @param[in,out] session   The session holding slot to release
+ * @param[in]     slot      Slot to release
+ * @param[in]     processed Whether the client's CB_SEQUENCE succeeded
  */
 
-static void release_cb_slot(nfs41_session_t *session, slotid4 slot, bool sent)
+static void release_cb_slot(nfs41_session_t *session, slotid4 slot,
+			    bool processed)
 {
 	PTHREAD_MUTEX_lock(&session->cb_mutex);
 	session->bc_slots[slot].in_use = false;
-	if (!sent)
+	if (!processed)
 		--session->bc_slots[slot].sequence;
 	PTHREAD_COND_broadcast(&session->cb_cond);
 	PTHREAD_MUTEX_unlock(&session->cb_mutex);
@@ -1427,10 +1437,27 @@ restart:
 
 void nfs41_release_single(rpc_call_t *call)
 {
+	const CB_COMPOUND4res *res = &call->cbt.v_u.v4.res;
+	bool processed = call->call_req.cc_error.re_status == RPC_SUCCESS &&
+			 res->resarray.resarray_len > 0 &&
+			 res->resarray.resarray_val[0].resop ==
+				 NFS4_OP_CB_SEQUENCE &&
+			 res->resarray.resarray_val[0]
+					 .nfs_cb_resop4_u.opcbsequence
+					 .csr_status == NFS4_OK;
+
+	if (!processed)
+		LogEvent(COMPONENT_NFS_CB,
+			 "Callback on slot %" PRIu32
+			 " not processed by the client (rpc status %d), keeping its sequence ID",
+			 call->cbt.v_u.v4.args.argarray.argarray_val[0]
+				 .nfs_cb_argop4_u.opcbsequence.csa_slotid,
+			 (int)call->call_req.cc_error.re_status);
+
 	release_cb_slot(call->chan->source.session,
 			call->cbt.v_u.v4.args.argarray.argarray_val[0]
 				.nfs_cb_argop4_u.opcbsequence.csa_slotid,
-			true);
+			processed);
 	dec_session_ref(call->chan->source.session);
 	release_v41(call);
 }
