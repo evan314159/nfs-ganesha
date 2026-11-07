@@ -635,6 +635,16 @@ macOS_quirk_late_reclaim(bool, default false)
     Lock reclaims are already accepted in that case. Follows
     macOS_quirks_only_for_macOS_clients.
 
+macOS_quirk_no_write_delegations(bool, default false)
+    Works around a macOS bug: macOS keeps a byte-range lock taken under a
+    write delegation on the client only, and when the delegation is
+    recalled it returns it without sending the lock to the server (unless
+    the open itself was made under the delegation). Another client can then
+    take a conflicting lock on the file. When set, an OPEN for write gets no
+    delegation, as with Delegations = Read in the export; read-only opens
+    still get read delegations, under which macOS sends its locks to the
+    server. Follows macOS_quirks_only_for_macOS_clients.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 

@@ -1280,6 +1280,24 @@ bool deleg_supported(struct fsal_obj_handle *obj,
 				"Delegation not supported: export permissions disable write delegations");
 			return false;
 		}
+#ifdef USE_MACOS_QUIRKS
+		/* macOS takes a byte-range lock under a write delegation
+		 * locally, and when the delegation is recalled it returns it
+		 * without sending those locks to the server unless the open
+		 * itself was delegated: nfs4_claim_delegated_state_for_node()
+		 * skips opens with no delegated open counts. Another client
+		 * can then take a conflicting lock. Under a read delegation
+		 * macOS sends its locks to the server.
+		 * @todo Remove once macOS is fixed.
+		 */
+		if (macos_quirk_applies(
+			    nfs_param.nfsv4_param.macos_quirk_no_write_delegations)) {
+			LogFullDebug(
+				COMPONENT_STATE,
+				"Delegation not supported: no write delegations for macOS (macOS_quirk_no_write_delegations)");
+			return false;
+		}
+#endif
 	} else {
 		assert(share_access & OPEN4_SHARE_ACCESS_READ);
 		if (!fsal_export->exp_ops.fs_supports(fsal_export,

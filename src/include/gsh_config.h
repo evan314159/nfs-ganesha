@@ -740,6 +740,10 @@ typedef struct nfs_version4_parameter {
 	    RECLAIM_COMPLETE. Settable with macOS_quirk_late_reclaim.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_late_reclaim;
+	/** Grant no write delegations. Settable with
+	    macOS_quirk_no_write_delegations.
+	    @todo Remove once macOS is fixed. */
+	bool macos_quirk_no_write_delegations;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */
