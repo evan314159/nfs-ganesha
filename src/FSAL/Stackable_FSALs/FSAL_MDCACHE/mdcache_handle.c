@@ -898,6 +898,77 @@ out:
 	return status;
 }
 
+/** Scalar attributes mdc_keep_cached_attrs() can carry over. */
+#define MDC_KEEP_ATTRS                                                        \
+	(ATTR_TYPE | ATTR_SIZE | ATTR_FSID | ATTR_FILEID | ATTR_MODE |        \
+	 ATTR_NUMLINKS | ATTR_OWNER | ATTR_GROUP | ATTR_RAWDEV | ATTR_ATIME | \
+	 ATTR_CREATION | ATTR_CTIME | ATTR_MTIME | ATTR_SPACEUSED |           \
+	 ATTR_GENERATION | ATTR_CHANGE | ATTR4_NAMED_ATTR |                   \
+	 ATTR4_MOUNTED_ON_FILEID)
+
+/**
+ * @brief Carry cached attributes the FSAL wasn't asked for into fresh ones
+ *
+ * When a delegated file's attributes are refreshed, only the attributes not
+ * already cached are fetched. mdc_update_attr_cache() replaces the cached
+ * attributes with what it is given, so without this the entry would keep only
+ * the few attributes just fetched: GETATTR would then answer without type,
+ * fileid, mode, owner and the rest, which clients can't use.
+ *
+ * ACL, fs_locations and the security label are carried over by
+ * mdc_update_attr_cache() itself.
+ *
+ * @param[in,out] fresh   The attributes just fetched
+ * @param[in]     cached  The entry's cached attributes
+ */
+static void mdc_keep_cached_attrs(struct fsal_attrlist *fresh,
+				  const struct fsal_attrlist *cached)
+{
+	attrmask_t keep = cached->valid_mask & ~fresh->valid_mask &
+			  MDC_KEEP_ATTRS;
+
+	if (keep & ATTR_TYPE)
+		fresh->type = cached->type;
+	if (keep & ATTR_SIZE)
+		fresh->filesize = cached->filesize;
+	if (keep & ATTR_FSID) {
+		fresh->fsid = cached->fsid;
+		fresh->fsid3 = cached->fsid3;
+	}
+	if (keep & ATTR_FILEID)
+		fresh->fileid = cached->fileid;
+	if (keep & ATTR_MODE)
+		fresh->mode = cached->mode;
+	if (keep & ATTR_NUMLINKS)
+		fresh->numlinks = cached->numlinks;
+	if (keep & ATTR_OWNER)
+		fresh->owner = cached->owner;
+	if (keep & ATTR_GROUP)
+		fresh->group = cached->group;
+	if (keep & ATTR_RAWDEV)
+		fresh->rawdev = cached->rawdev;
+	if (keep & ATTR_ATIME)
+		fresh->atime = cached->atime;
+	if (keep & ATTR_CREATION)
+		fresh->creation = cached->creation;
+	if (keep & ATTR_CTIME)
+		fresh->ctime = cached->ctime;
+	if (keep & ATTR_MTIME)
+		fresh->mtime = cached->mtime;
+	if (keep & ATTR_SPACEUSED)
+		fresh->spaceused = cached->spaceused;
+	if (keep & ATTR_GENERATION)
+		fresh->generation = cached->generation;
+	if (keep & ATTR_CHANGE)
+		fresh->change = cached->change;
+	if (keep & ATTR4_NAMED_ATTR)
+		fresh->named_attr = cached->named_attr;
+	if (keep & ATTR4_MOUNTED_ON_FILEID)
+		fresh->mounted_on_fileid = cached->mounted_on_fileid;
+
+	fresh->valid_mask |= keep;
+}
+
 /**
  * @brief Refresh the attributes for an mdcache entry.
  *
@@ -923,6 +994,7 @@ fsal_status_t mdcache_refresh_attrs(mdcache_entry_t *entry, bool need_acl,
 	fsal_status_t status = { 0, 0 };
 	struct timespec oldmtime;
 	bool file_deleg = false;
+	bool partial = false;
 	cbgetattr_t *cbgetattr;
 	uint32_t original_generation;
 	fsal_acl_t *old_acl = NULL;
@@ -969,6 +1041,7 @@ fsal_status_t mdcache_refresh_attrs(mdcache_entry_t *entry, bool need_acl,
 		 */
 		attrs.request_mask =
 			(attrs.request_mask & ~entry->attrs.valid_mask);
+		partial = true;
 
 		/* Bail out if ATTR_RDATTR_ERR is the only remaining
 		 * attr set
@@ -1011,6 +1084,9 @@ fsal_status_t mdcache_refresh_attrs(mdcache_entry_t *entry, bool need_acl,
 
 		return status;
 	}
+
+	if (partial)
+		mdc_keep_cached_attrs(&attrs, &entry->attrs);
 
 	mdc_update_attr_cache(entry, &attrs);
 	if (atomic_fetch_int32_t(&entry->attr_generation) !=
