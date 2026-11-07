@@ -3897,37 +3897,41 @@ nfsstat4 file_To_Fattr(compound_data_t *data, attrmask_t request_mask,
 			? data->current_obj->state_hdl->file.cbgetattr.state
 			: -1);
 
+	status = data->current_obj->obj_ops->getattrs(data->current_obj, attr);
+	if (FSAL_IS_ERROR(status))
+		return nfs4_Errno_status(status);
+
 	if (data->current_obj->type == REGULAR_FILE &&
 	    data->current_obj->state_hdl != NULL &&
 	    data->current_obj->state_hdl->file.cbgetattr.state ==
 		    CB_GETATTR_RSP_OK) {
-		LogDebug(COMPONENT_NFS_V4,
-			 "Using callback attributes instead of FSAL getattrs");
+		/* Another client holds a write delegation, and answered our
+		 * CB_GETATTR. Per RFC 8881 section 10.4.3, its change and
+		 * size override ours; the rest of the attributes are still
+		 * the FSAL's. If it modified the file, report the time we
+		 * learned of it as the modification time.
+		 */
+		const cbgetattr_t *cbgetattr =
+			&data->current_obj->state_hdl->file.cbgetattr;
 
-		/* Use callback attributes instead of calling FSAL getattrs */
-		attr->valid_mask = ATTR_CHANGE | ATTR_SIZE | ATTR_MTIME |
-				   ATTR_CTIME;
-		attr->change =
-			data->current_obj->state_hdl->file.cbgetattr.change;
-		attr->filesize =
-			data->current_obj->state_hdl->file.cbgetattr.filesize;
-		attr->mtime.tv_sec = time(NULL);
-		attr->mtime.tv_nsec = 0;
-		attr->ctime.tv_sec = time(NULL);
-		attr->ctime.tv_nsec = 0;
+		attr->change = cbgetattr->change;
+		attr->filesize = cbgetattr->filesize;
+		attr->valid_mask |= ATTR_CHANGE | ATTR_SIZE;
+
+		if (cbgetattr->modified) {
+			struct timespec ts;
+
+			now(&ts);
+			attr->mtime = ts;
+			attr->ctime = ts;
+			attr->valid_mask |= ATTR_MTIME | ATTR_CTIME;
+		}
 
 		LogDebug(COMPONENT_NFS_V4,
-			 "Using callback attributes - change=%llu, size=%llu",
+			 "Using callback change=%llu size=%llu modified=%d",
 			 (unsigned long long)attr->change,
-			 (unsigned long long)attr->filesize);
-	} else {
-		/* Normal FSAL getattrs call */
-		LogDebug(COMPONENT_NFS_V4,
-			 "Using FSAL getattrs (not using callback attributes)");
-		status = data->current_obj->obj_ops->getattrs(data->current_obj,
-							      attr);
-		if (FSAL_IS_ERROR(status))
-			return nfs4_Errno_status(status);
+			 (unsigned long long)attr->filesize,
+			 cbgetattr->modified);
 	}
 
 	if (attribute_is_set(Bitmap, FATTR4_MOUNTED_ON_FILEID))
