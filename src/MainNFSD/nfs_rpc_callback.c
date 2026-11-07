@@ -901,7 +901,8 @@ int nfs_rpc_create_chan_v41(SVCXPRT *xprt, nfs41_session_t *session,
 		goto out;
 	}
 
-	atomic_set_uint32_t_bits(&session->flags, session_bc_up);
+	atomic_set_uint32_t_bits(&session->flags,
+				 session_bc_up | session_bc_wanted);
 
 out:
 	if (code != 0) {

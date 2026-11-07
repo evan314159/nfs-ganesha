@@ -724,6 +724,10 @@ typedef struct nfs_version4_parameter {
 	    Settable with macOS_quirk_free_anonymous_stateid.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_free_anonymous_stateid;
+	/** Rebind a lost backchannel to the connection a SEQUENCE comes on.
+	    Settable with macOS_quirk_rebind_backchannel.
+	    @todo Remove once macOS is fixed. */
+	bool macos_quirk_rebind_backchannel;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */
