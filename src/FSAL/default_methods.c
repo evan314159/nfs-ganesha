@@ -623,6 +623,15 @@ static enum fsal_readdir_mode fs_readdir_mode(struct fsal_export *exp_hdl)
 	return fsal_readdir_mode(&exp_hdl->fsal->fs_info);
 }
 
+/* fs_deleg_recall_limit
+ * By default there is no limit beyond the lease time.
+ */
+
+static uint32_t fs_deleg_recall_limit(struct fsal_export *exp_hdl)
+{
+	return 0;
+}
+
 /* check_quota
  * return happiness for now.
  */
@@ -798,6 +807,7 @@ struct export_ops def_export_ops = {
 	.is_superuser = is_superuser,
 	.fs_expiretimeparent = fs_expiretimeparent,
 	.fs_readdir_mode = fs_readdir_mode,
+	.fs_deleg_recall_limit = fs_deleg_recall_limit,
 };
 
 /* fsal_obj_handle common methods

@@ -354,7 +354,7 @@ extern struct gsh_refstr *no_export;
  * rules), increment the minor version
  */
 
-#define FSAL_MINOR_VERSION 1
+#define FSAL_MINOR_VERSION 2
 
 /* Forward references for object methods */
 
@@ -1444,6 +1444,25 @@ struct export_ops {
  */
 
 	enum fsal_readdir_mode (*fs_readdir_mode)(struct fsal_export *exp_hdl);
+
+	/**
+ * @brief How long a recalled delegation may go unreturned before it is
+ *        revoked
+ *
+ * Normally Ganesha waits for the lease time before revoking a delegation
+ * that the client hasn't returned. Some FSALs can't hold a delegation that
+ * long. FSAL_VFS, for example, backs each delegation with a kernel
+ * delegation, and the kernel only makes a conflicting process wait for
+ * fs.lease-break-time before letting it go ahead. Revoking the delegation
+ * before then stops the client from using it after the file has changed.
+ *
+ * @param[in] exp_hdl Filesystem to interrogate
+ *
+ * @return Seconds after the recall, or 0 for no limit beyond the lease
+ *         time.
+ */
+
+	uint32_t (*fs_deleg_recall_limit)(struct fsal_export *exp_hdl);
 };
 
 /**

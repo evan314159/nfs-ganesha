@@ -1047,12 +1047,35 @@ bool eval_deleg_revoke(struct state_t *deleg_state)
 	time_t curr_time;
 	time_t recall_success_time, first_recall_time;
 	uint32_t lease_lifetime = nfs_param.nfsv4_param.lease_lifetime;
+	uint32_t recall_limit = 0;
 
 	clfl_stats = &deleg_state->state_data.deleg.sd_clfile_stats;
 
 	curr_time = time(NULL);
 	recall_success_time = clfl_stats->cfd_rs_time;
 	first_recall_time = clfl_stats->cfd_r_time;
+
+	/* Some FSALs can't hold a recalled delegation for the whole lease time.
+	 * FSAL_VFS, for example, uses kernel delegations, and the kernel lets
+	 * the waiting process go ahead after fs.lease-break-time even if the
+	 * client still has the delegation. If the FSAL gives a limit, revoke
+	 * the delegation once that much time has passed since the recall. FSALs
+	 * without a limit return 0. If op_ctx has no export, there is no FSAL
+	 * to ask.
+	 */
+	if (op_ctx != NULL && op_ctx->fsal_export != NULL)
+		recall_limit =
+			op_ctx->fsal_export->exp_ops.fs_deleg_recall_limit(
+				op_ctx->fsal_export);
+
+	if (recall_limit > 0 && first_recall_time > 0 &&
+	    (curr_time - first_recall_time) >= recall_limit) {
+		LogInfo(COMPONENT_STATE,
+			"More than the FSAL's %" PRIu32
+			" seconds have passed since recall was attempted",
+			recall_limit);
+		return true;
+	}
 
 	if ((recall_success_time > 0) &&
 	    (curr_time - recall_success_time) > lease_lifetime) {
