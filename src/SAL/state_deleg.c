@@ -124,6 +124,42 @@ state_status_t do_lease_op(struct fsal_obj_handle *obj, state_t *state,
 }
 
 /**
+ * @brief Save the file's change attribute and size when a delegation is granted
+ *
+ * When Ganesha later sends CB_GETATTR, it compares the client's reply with
+ * these values to tell whether the client has modified the file. MDCACHE also
+ * saves them whenever it refreshes the attributes of a delegated file, but that
+ * may not happen before the CB_GETATTR, for example for a file that was just
+ * created and whose attributes are still cached.
+ *
+ * @note Called with st_lock held. Getting attributes while holding it is safe,
+ *       since OPEN already does so through fsal_open2().
+ *
+ * @param[in] obj  File the delegation was granted on
+ */
+static void save_cbgetattr_attrs(struct fsal_obj_handle *obj)
+{
+	cbgetattr_t *cbgetattr = &obj->state_hdl->file.cbgetattr;
+	struct fsal_attrlist attrs;
+	fsal_status_t fsal_status;
+
+	fsal_prepare_attrs(&attrs, ATTR_CHANGE | ATTR_SIZE);
+
+	fsal_status = obj->obj_ops->getattrs(obj, &attrs);
+
+	if (FSAL_IS_ERROR(fsal_status)) {
+		LogDebug(COMPONENT_STATE,
+			 "Could not get attributes of delegated file, error=%s",
+			 fsal_err_txt(fsal_status));
+	} else {
+		cbgetattr->change = attrs.change;
+		cbgetattr->filesize = attrs.filesize;
+	}
+
+	fsal_release_attrs(&attrs);
+}
+
+/**
  * @brief Attempt to acquire a lease lock (delegation)
  *
  * @note The st_lock MUST be held
@@ -151,6 +187,7 @@ state_status_t acquire_lease_lock(struct state_hdl *ostate,
 	if (status == STATE_SUCCESS) {
 		update_delegation_stats(ostate, owner);
 		reset_cbgetattr_stats(ostate->file.obj);
+		save_cbgetattr_attrs(ostate->file.obj);
 	} else {
 		LogDebug(COMPONENT_STATE, "Could not set lease, error=%s",
 			 state_err_str(status));
