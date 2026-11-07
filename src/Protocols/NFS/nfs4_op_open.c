@@ -101,6 +101,29 @@ static nfsstat4 open4_create_fh(compound_data_t *data,
 	return NFS4_OK;
 }
 
+#ifdef USE_MACOS_QUIRKS
+/**
+ * @brief Whether to accept a reclaim after the client's RECLAIM_COMPLETE
+ *
+ * After a server restart, the macOS client gets NFS4ERR_BADSESSION and
+ * rebuilds its session with nfs41_exchangeid() as for a new mount, which
+ * sends RECLAIM_COMPLETE right after CREATE_SESSION. Only then does its
+ * recovery reclaim the opens, locks and delegations it held. RFC 8881 says
+ * those reclaims get NFS4ERR_NO_GRACE, and macOS then loses every file that
+ * held a byte-range lock or a deny-mode open. With
+ * macOS_quirk_late_reclaim we accept them anyway, as long as the server is
+ * still in grace and the client was in the recovery records (both still
+ * checked). Lock conflicts are checked as for any reclaim.
+ *
+ * @todo Remove once macOS is fixed.
+ */
+static bool late_reclaim_quirk(void)
+{
+	return macos_quirk_applies(
+		nfs_param.nfsv4_param.macos_quirk_late_reclaim);
+}
+#endif
+
 /**
  * @brief Validate claim type
  *
@@ -151,10 +174,18 @@ static nfsstat4 open4_validate_claim(compound_data_t *data,
 
 	case CLAIM_PREVIOUS:
 		want_grace = true;
-		if ((!clientid->cid_allow_reclaim && !fsal_grace_support) ||
-		    ((data->minorversion > 0) &&
-		     clientid->cid_cb.v41.cid_reclaim_complete))
+		if (!clientid->cid_allow_reclaim && !fsal_grace_support)
 			status = NFS4ERR_NO_GRACE;
+		else if ((data->minorversion > 0) &&
+			 clientid->cid_cb.v41.cid_reclaim_complete) {
+#ifdef USE_MACOS_QUIRKS
+			if (late_reclaim_quirk())
+				LogInfo(COMPONENT_STATE,
+					"Accepting a reclaim after RECLAIM_COMPLETE (macOS_quirk_late_reclaim)");
+			else
+#endif
+				status = NFS4ERR_NO_GRACE;
+		}
 		break;
 
 	case CLAIM_DELEGATE_CUR:
