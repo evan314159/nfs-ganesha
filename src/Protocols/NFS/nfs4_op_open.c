@@ -105,12 +105,14 @@ static nfsstat4 open4_create_fh(compound_data_t *data,
 /**
  * @brief Whether to accept a reclaim after the client's RECLAIM_COMPLETE
  *
- * After a server restart, the macOS client gets NFS4ERR_BADSESSION and
- * rebuilds its session with nfs41_exchangeid() as for a new mount, which
- * sends RECLAIM_COMPLETE right after CREATE_SESSION. Only then does its
- * recovery reclaim the opens, locks and delegations it held. RFC 8881 says
- * those reclaims get NFS4ERR_NO_GRACE, and macOS then loses every file that
- * held a byte-range lock or a deny-mode open. With
+ * A server restart drops the macOS client's connection. On reconnect,
+ * nfs_connect_setup() calls nfs4_create_clientid(nmp, R_SETUP), and
+ * nfs41_exchangeid(), finding its session gone, sends EXCHANGE_ID,
+ * CREATE_SESSION and, since R_RECOVER is not set, RECLAIM_COMPLETE. Only
+ * then does nfs_recover() reclaim the opens it held. RFC 8881 has those
+ * reclaims fail with NFS4ERR_NO_GRACE. macOS then reopens a plain open,
+ * but a file with byte-range locks ("can't reopen because of locks") or a
+ * deny-mode open is marked lost, and its locks are never reclaimed. With
  * macOS_quirk_late_reclaim we accept them anyway, as long as the server is
  * still in grace and the client was in the recovery records (both still
  * checked). Lock conflicts are checked as for any reclaim.
