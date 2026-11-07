@@ -732,6 +732,10 @@ typedef struct nfs_version4_parameter {
 	    Settable with macOS_quirk_retry_delay.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_retry_delay;
+	/** Answer NFS4_OK to DELEGRETURN of a delegation from an earlier
+	    server instance. Settable with macOS_quirk_return_stale_delegation.
+	    @todo Remove once macOS is fixed. */
+	bool macos_quirk_return_stale_delegation;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */

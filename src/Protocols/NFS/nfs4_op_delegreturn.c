@@ -47,6 +47,48 @@
 #include "nfs_proto_functions.h"
 #include "sal_functions.h"
 
+#ifdef USE_MACOS_QUIRKS
+/**
+ * @brief Whether a DELEGRETURN is of a delegation from an earlier server
+ *        instance, to be answered with NFS4_OK
+ *
+ * After a server restart, macOS establishes a new client ID and then, in
+ * nfs4_expired_check_delegation(), returns each delegation it still thinks
+ * it holds. It sends that DELEGRETURN without R_RECOVER, so the
+ * NFS4ERR_BAD_STATEID we answer for a stateid from an earlier instance makes
+ * nfs41_request_error_should_restart() wait for recovery, in the recovery
+ * thread itself, and the mount hangs. The delegation went away with the
+ * earlier instance, so with macOS_quirk_return_stale_delegation we answer
+ * NFS4_OK.
+ *
+ * @todo Remove once macOS is fixed.
+ *
+ * @param[in] stateid  The delegation stateid being returned
+ *
+ * @return true to answer NFS4_OK without looking further.
+ */
+static bool return_stale_delegation_quirk(const stateid4 *stateid)
+{
+	clientid4 clientid;
+	uint32_t epoch;
+
+	memcpy(&clientid, stateid->other, sizeof(clientid));
+	epoch = clientid >> (clientid4)32;
+
+	/* Leave the special stateids (all zeros, all ones) to the usual
+	 * checks.
+	 */
+	if (epoch == 0 || epoch == UINT32_MAX)
+		return false;
+
+	if (epoch == (uint32_t)(get_unique_server_id() & 0xFFFFFFFF))
+		return false;
+
+	return macos_quirk_applies(
+		nfs_param.nfsv4_param.macos_quirk_return_stale_delegation);
+}
+#endif
+
 /**
  * @brief NFS4_OP_DELEGRETURN
  *
@@ -90,6 +132,16 @@ enum nfs_req_result nfs4_op_delegreturn(struct nfs_argop4 *op,
 			res_DELEGRETURN4->status = NFS4ERR_INVAL;
 		return NFS_REQ_ERROR;
 	}
+
+#ifdef USE_MACOS_QUIRKS
+	if (data->minorversion > 0 &&
+	    return_stale_delegation_quirk(&arg_DELEGRETURN4->deleg_stateid)) {
+		LogInfo(COMPONENT_STATE,
+			"DELEGRETURN of a delegation from an earlier server instance, answering NFS4_OK");
+		res_DELEGRETURN4->status = NFS4_OK;
+		return NFS_REQ_OK;
+	}
+#endif
 
 	/* Check stateid correctness and get pointer to state */
 	res_DELEGRETURN4->status =

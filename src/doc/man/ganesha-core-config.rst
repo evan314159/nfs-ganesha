@@ -616,6 +616,15 @@ macOS_quirk_retry_delay(bool, default false)
     sent. This holds a worker thread while it waits. Follows
     macOS_quirks_only_for_macOS_clients.
 
+macOS_quirk_return_stale_delegation(bool, default false)
+    Works around a macOS bug: after a server restart, macOS returns the
+    delegations it held before the restart, and the NFS4ERR_BAD_STATEID
+    answer makes its recovery thread wait for recovery, that is, for
+    itself, so the mount hangs. When set, an NFSv4.1 DELEGRETURN of a
+    stateid from an earlier server instance is answered with NFS4_OK; the
+    delegation no longer exists, so there is nothing to return. Follows
+    macOS_quirks_only_for_macOS_clients.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 
