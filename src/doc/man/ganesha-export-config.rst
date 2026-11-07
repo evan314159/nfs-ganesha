@@ -130,6 +130,15 @@ macOS_quirk_mounted_on_fileid(bool, default false)
     can also have, and du reports a cycle. When set, GETATTR returns fileid
     as mounted_on_fileid. READDIR is unchanged.
 
+macOS_quirk_named_attr_deleg(bool, default false)
+    Works around a macOS bug: macOS caches whether a file has named
+    attributes, and doesn't update that when it creates the first one. With a
+    delegation on the file it doesn't fetch the file's attributes again until
+    its attribute cache expires (acregmax, 60 seconds by default), so for that
+    long it says the new extended attribute doesn't exist. When set, creating
+    a file's first named attribute recalls the client's delegation on the
+    file, so it fetches them again. Only FSAL_VFS and FSAL_XFS use this.
+
 The macOS quirks are not standard NFS behaviour. They exist only if Ganesha
 is built with the CMake option USE_MACOS_QUIRKS, which is off by default,
 and can only be set in CLIENT blocks. By default they apply only to macOS

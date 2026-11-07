@@ -60,7 +60,8 @@ VFS {}
     OPENATTR returns NFS4ERR_NOTSUPP.
 
 macOS clients also need macOS_quirk_named_attr_NVERIFY and
-macOS_quirk_named_attr_truncate in CLIENT blocks: see
+macOS_quirk_named_attr_truncate in CLIENT blocks, and with delegations,
+macOS_quirk_named_attr_deleg: see
 :doc:`ganesha-export-config <ganesha-export-config>`\(8).
 
 **notify_local_changes(bool, default false)**

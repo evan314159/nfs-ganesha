@@ -103,6 +103,9 @@ struct macos_quirks {
 	/* @todo Remove once macOS is fixed. */
 	bool mounted_on_fileid; /*< GETATTR returns fileid as
 				    mounted_on_fileid */
+	/* @todo Remove once macOS is fixed. */
+	bool named_attr_deleg; /*< Recall the client's delegation when it
+				   creates a file's first named attribute */
 };
 #endif /* USE_MACOS_QUIRKS */
 

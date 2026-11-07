@@ -824,6 +824,8 @@ static fsal_status_t named_attr_update(struct vfs_attr_handle *hdl,
 /* @todo Remove once macOS is fixed. */
 static fsal_status_t named_attr_truncate_on_open(struct vfs_attr_handle *hdl,
 						 fsal_openflags_t openflags);
+/* @todo Remove once macOS is fixed. */
+static bool named_attr_first_recalls(int fd);
 #endif
 
 /**
@@ -892,7 +894,13 @@ attr_dir_open2(struct fsal_obj_handle *dir_hdl, struct state_t *state,
 		}
 
 		/* See named_attr_update() about delegations */
-		suspended = vfs_deleg_suspend_handle(&dir->parent);
+#ifdef USE_MACOS_QUIRKS
+		/* @todo Remove once macOS is fixed. */
+		if (named_attr_first_recalls(fd))
+			suspended = false;
+		else
+#endif
+			suspended = vfs_deleg_suspend_handle(&dir->parent);
 		rc = fsetxattr(fd, xname, "", 0, 0);
 		err = errno;
 		if (suspended)
@@ -1324,6 +1332,36 @@ out:
 }
 
 #ifdef USE_MACOS_QUIRKS
+/**
+ * @brief Whether creating a named attribute should recall the delegation
+ *
+ * macOS caches whether a file has named attributes, and doesn't update that
+ * when it creates the first one. While it holds a delegation on the file it
+ * doesn't fetch the file's attributes again until its attribute cache expires,
+ * so for up to a minute it says the new extended attribute doesn't exist.
+ * macOS_quirk_named_attr_deleg in a CLIENT block makes creating a file's
+ * first named attribute recall the delegation, so macOS fetches them again.
+ * It is off by default because clients that follow the standard don't need
+ * it, and are better off keeping their delegation.
+ *
+ * @todo Remove once macOS is fixed.
+ *
+ * @param[in] fd  The file the named attribute belongs to
+ *
+ * @return true to recall.
+ */
+static bool named_attr_first_recalls(int fd)
+{
+	bool any;
+
+	if (!macos_quirk_applies(
+		    op_ctx->export_perms.macos_quirks.named_attr_deleg))
+		return false;
+
+	/* If we can't tell, recall: that's always safe */
+	return attr_any_at(fd, NULL, &any) != 0 || !any;
+}
+
 /**
  * @brief Truncate a named attribute opened for writing, if configured
  *
