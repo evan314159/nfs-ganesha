@@ -720,6 +720,10 @@ typedef struct nfs_version4_parameter {
 	    macOS_quirk_pad_handles.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_pad_handles;
+	/** Rebind a lost backchannel to the connection a SEQUENCE comes on.
+	    Settable with macOS_quirk_rebind_backchannel.
+	    @todo Remove once macOS is fixed. */
+	bool macos_quirk_rebind_backchannel;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */

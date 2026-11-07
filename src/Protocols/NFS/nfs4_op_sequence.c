@@ -121,6 +121,49 @@ errout:
 	}
 }
 
+#ifdef USE_MACOS_QUIRKS
+/**
+ * @brief Rebind a session's lost backchannel to the current connection
+ *
+ * macOS has no BIND_CONN_TO_SESSION. When its connection drops, the session's
+ * backchannel goes with it, and once it reconnects, every SEQUENCE answer
+ * carries SEQ4_STATUS_CB_PATH_DOWN. macOS takes that as an error and creates
+ * a new session. The replies to the requests it resends on the old session
+ * then fail with NFS4ERR_BADSESSION, which sends it into state recovery, and
+ * recovery waits on those same requests, so the mount hangs. With
+ * macOS_quirk_rebind_backchannel, a SEQUENCE for a session that had a
+ * backchannel and lost it binds the backchannel to the connection it came on.
+ *
+ * @todo Remove once macOS is fixed.
+ *
+ * @param[in] session  The SEQUENCE's session
+ * @param[in] data     Compound request's data
+ */
+static void rebind_backchannel_quirk(nfs41_session_t *session,
+				     compound_data_t *data)
+{
+	uint32_t flags = atomic_fetch_uint32_t(&session->flags);
+
+	if ((flags & (session_bc_wanted | session_bc_up)) != session_bc_wanted)
+		return;
+
+	if (session->clientid_record->cid_state_protect_how != SP4_NONE)
+		return;
+
+	if (!macos_quirk_applies(
+		    nfs_param.nfsv4_param.macos_quirk_rebind_backchannel))
+		return;
+
+	if (nfs_rpc_create_chan_v41(data->req->rq_xprt, session,
+				    session->cb_sec_parms.sec_parms_len,
+				    session->cb_sec_parms.sec_parms_val) == 0 &&
+	    (atomic_fetch_uint32_t(&session->flags) & session_bc_up))
+		LogInfo(COMPONENT_SESSIONS,
+			"Rebound lost backchannel of session %p to xprt FD %d",
+			session, data->req->rq_xprt->xp_fd);
+}
+#endif
+
 /**
  * @brief the NFS4_OP_SEQUENCE operation
  *
@@ -323,6 +366,11 @@ enum nfs_req_result nfs4_op_sequence(struct nfs_argop4 *op,
 		session->fore_channel_attrs.ca_maxrequests - 1;
 
 	res_SEQUENCE4->SEQUENCE4res_u.sr_resok4.sr_status_flags = 0;
+
+#ifdef USE_MACOS_QUIRKS
+	/* @todo Remove once macOS is fixed. */
+	rebind_backchannel_quirk(session, data);
+#endif
 
 	if (nfs_rpc_get_chan(session->clientid_record, 0) == NULL) {
 		res_SEQUENCE4->SEQUENCE4res_u.sr_resok4.sr_status_flags |=
