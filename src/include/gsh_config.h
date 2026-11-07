@@ -728,6 +728,10 @@ typedef struct nfs_version4_parameter {
 	    Settable with macOS_quirk_rebind_backchannel.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_rebind_backchannel;
+	/** Wait and re-run an NFSv4.1 op that returned NFS4ERR_DELAY.
+	    Settable with macOS_quirk_retry_delay.
+	    @todo Remove once macOS is fixed. */
+	bool macos_quirk_retry_delay;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */

@@ -606,6 +606,16 @@ macOS_quirk_rebind_backchannel(bool, default false)
     connection the SEQUENCE came on. Follows
     macOS_quirks_only_for_macOS_clients.
 
+macOS_quirk_retry_delay(bool, default false)
+    Works around a macOS bug: on NFSv4.1, macOS turns an NFS4ERR_DELAY
+    reply into EBADRPC for the application instead of retrying, so a stat
+    or open of a file another client holds a delegation on fails. When set,
+    a GETATTR, OPEN, SETATTR, REMOVE, RENAME or LINK that gets
+    NFS4ERR_DELAY (for example while a delegation is being recalled) is
+    re-run after a short wait, for up to 2 seconds, before NFS4ERR_DELAY is
+    sent. This holds a worker thread while it waits. Follows
+    macOS_quirks_only_for_macOS_clients.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 

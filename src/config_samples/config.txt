@@ -331,6 +331,9 @@ NFSV4 {}
 	macOS_quirk_rebind_backchannel(bool, default false)
 		* macOS client workaround; see ganesha-core-config(8).
 
+	macOS_quirk_retry_delay(bool, default false)
+		* macOS client workaround; see ganesha-core-config(8).
+
 	Delegations(bool, default false)
 
 	Deleg_Recall_Retry_Delay(uint32_t, range 0 to 10, default 1)
