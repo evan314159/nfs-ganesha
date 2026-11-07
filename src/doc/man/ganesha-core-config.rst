@@ -586,6 +586,15 @@ macOS_quirk_pad_handles(bool, default false)
     This ignores macOS_quirks_only_for_macOS_clients and applies to every
     client, because callbacks send handles without knowing the client.
 
+macOS_quirk_free_anonymous_stateid(bool, default false)
+    Works around a macOS bug: a lock macOS takes under a write delegation
+    stays local, so its lock owner never gets a stateid, yet when the file
+    is closed macOS sends FREE_STATEID for it with the anonymous (all-zero)
+    stateid. The NFS4ERR_BAD_STATEID reply sends macOS into state recovery,
+    which waits on the close still in progress, so the mount hangs. When
+    set, FREE_STATEID of the anonymous stateid succeeds, since it frees
+    nothing. Follows macOS_quirks_only_for_macOS_clients.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 

@@ -67,6 +67,37 @@
  * @see nfs4_Compound
  */
 
+#ifdef USE_MACOS_QUIRKS
+/**
+ * @brief Whether to accept FREE_STATEID of the anonymous stateid
+ *
+ * A lock the macOS client takes under a write delegation stays local, so its
+ * lock owner never gets a stateid from the server. When the file is closed,
+ * macOS frees the lock owner's stateid anyway, which is still all zeros. The
+ * server rightly answers NFS4ERR_BAD_STATEID, which sends macOS into state
+ * recovery, and recovery then waits on the close that is still in progress,
+ * so every later operation on the mount hangs. Freeing the anonymous stateid
+ * frees nothing, so with macOS_quirk_free_anonymous_stateid we answer NFS4_OK.
+ *
+ * @todo Remove once macOS is fixed.
+ *
+ * @param[in] stateid  The stateid to free
+ *
+ * @return true to answer NFS4_OK without looking further.
+ */
+static bool free_anonymous_stateid_quirk(const stateid4 *stateid)
+{
+	static const char zeros[OTHERSIZE];
+
+	if (stateid->seqid != 0 ||
+	    memcmp(stateid->other, zeros, OTHERSIZE) != 0)
+		return false;
+
+	return macos_quirk_applies(
+		nfs_param.nfsv4_param.macos_quirk_free_anonymous_stateid);
+}
+#endif
+
 enum nfs_req_result nfs4_op_free_stateid(struct nfs_argop4 *op,
 					 compound_data_t *data,
 					 struct nfs_resop4 *resp)
@@ -123,6 +154,14 @@ enum nfs_req_result nfs4_op_free_stateid(struct nfs_argop4 *op,
 		res_FREE_STATEID4->fsr_status = NFS4_OK;
 		return NFS_REQ_OK;
 	}
+
+#ifdef USE_MACOS_QUIRKS
+	/* @todo Remove once macOS is fixed. */
+	if (free_anonymous_stateid_quirk(&arg_FREE_STATEID4->fsa_stateid)) {
+		res_FREE_STATEID4->fsr_status = NFS4_OK;
+		return NFS_REQ_OK;
+	}
+#endif
 
 	res_FREE_STATEID4->fsr_status =
 		nfs4_Check_Stateid(&arg_FREE_STATEID4->fsa_stateid, NULL,
