@@ -940,6 +940,9 @@ static struct config_item version4_params[] = {
 	/* @todo Remove once macOS is fixed. */
 	CONF_ITEM_BOOL("macOS_quirk_pad_handles", false, nfs_version4_parameter,
 		       macos_quirk_pad_handles),
+	/* @todo Remove once macOS is fixed. */
+	CONF_ITEM_BOOL("macOS_quirk_rebind_backchannel", false,
+		       nfs_version4_parameter, macos_quirk_rebind_backchannel),
 #endif
 	CONF_ITEM_BOOL("Delegations", false, nfs_version4_parameter,
 		       allow_delegations),

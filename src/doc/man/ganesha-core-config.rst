@@ -586,6 +586,17 @@ macOS_quirk_pad_handles(bool, default false)
     This ignores macOS_quirks_only_for_macOS_clients and applies to every
     client, because callbacks send handles without knowing the client.
 
+macOS_quirk_rebind_backchannel(bool, default false)
+    Works around a macOS bug: macOS has no BIND_CONN_TO_SESSION, so after
+    it reconnects, its session has no backchannel and SEQUENCE answers
+    carry SEQ4_STATUS_CB_PATH_DOWN. macOS then creates a new session, and
+    the replies to requests it resends on the old session fail with
+    NFS4ERR_BADSESSION. That sends macOS into state recovery, which waits
+    on those same requests, so the mount hangs. When set, a SEQUENCE for a
+    session that has lost its backchannel binds the backchannel to the
+    connection the SEQUENCE came on. Follows
+    macOS_quirks_only_for_macOS_clients.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 

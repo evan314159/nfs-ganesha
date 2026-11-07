@@ -172,6 +172,7 @@ typedef struct nfs41_cb_session_slot {
 enum {
 	session_bc_up = 0x01,
 	session_bc_fault = 0x02, /* not actually used anywhere */
+	session_bc_wanted = 0x04, /* a backchannel was ever set up */
 };
 
 /**
