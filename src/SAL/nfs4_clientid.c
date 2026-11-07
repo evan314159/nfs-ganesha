@@ -1383,7 +1383,11 @@ bool nfs_client_id_expire(nfs_client_id_t *clientid, bool make_stale,
 		 * in the reclaim table.
 		 */
 		if (clientid->cid_allow_reclaim &&
-		    clientid->cid_cb.v41.cid_reclaim_complete)
+		    clientid->cid_cb.v41.cid_reclaim_complete
+#ifdef USE_MACOS_QUIRKS
+		    && !clientid->cid_reclaim_complete_uncounted
+#endif
+		)
 			atomic_dec_int32_t(&reclaim_completes);
 	}
 

@@ -790,6 +790,10 @@ struct nfs_client_id_t {
 	/* @todo Remove with the last macOS quirk. */
 	bool cid_macos; /*< The client gave apple.com as its implementation
 			    domain in EXCHANGE_ID */
+	bool cid_reclaim_complete_uncounted; /*< Its RECLAIM_COMPLETE is not
+						 yet counted toward lifting
+						 grace
+						 (macOS_quirk_late_reclaim) */
 #endif
 
 	uint32_t curr_deleg_grants; /* current num of delegations owned by
