@@ -42,6 +42,7 @@
 #include "log.h"
 #include "nfs4.h"
 #include "nfs_core.h"
+#include "nfs_convert.h"
 #include "nfs_exports.h"
 #include "nfs_file_handle.h"
 #include "nfs_proto_functions.h"
@@ -49,39 +50,49 @@
 
 #ifdef USE_MACOS_QUIRKS
 /**
- * @brief Whether a DELEGRETURN is of a delegation from an earlier server
- *        instance, to be answered with NFS4_OK
+ * @brief Whether to answer NFS4_OK to a DELEGRETURN whose stateid failed its
+ *        check because it belongs to an earlier client ID
  *
- * After a server restart, macOS establishes a new client ID and then, in
- * nfs4_expired_check_delegation(), returns each delegation it still thinks
- * it holds. It sends that DELEGRETURN without R_RECOVER, so the
- * NFS4ERR_BAD_STATEID we answer for a stateid from an earlier instance makes
- * nfs41_request_error_should_restart() wait for recovery, in the recovery
- * thread itself, and the mount hangs. The delegation went away with the
- * earlier instance, so with macOS_quirk_return_stale_delegation we answer
- * NFS4_OK.
+ * When macOS's state is lost (a server restart, or a lease expiry or
+ * revoke followed by a new client ID), its recovery establishes a new
+ * client ID and then, in nfs4_expired_check_delegation(), returns each
+ * delegation it still thinks it holds. It sends that DELEGRETURN without
+ * R_RECOVER, so the NFS4ERR_BAD_STATEID we answer for a stateid of the
+ * earlier client ID makes nfs41_request_error_should_restart() wait for
+ * recovery, in the recovery thread itself, and the mount hangs. The
+ * delegation went away with that client ID (or with the earlier server
+ * instance), so with macOS_quirk_return_stale_delegation we answer NFS4_OK.
  *
  * @todo Remove once macOS is fixed.
  *
+ * @param[in] data     Compound data
  * @param[in] stateid  The delegation stateid being returned
+ * @param[in] status   What the stateid check returned
  *
- * @return true to answer NFS4_OK without looking further.
+ * @return true to answer NFS4_OK instead.
  */
-static bool return_stale_delegation_quirk(const stateid4 *stateid)
+static bool return_stale_delegation_quirk(compound_data_t *data,
+					  const stateid4 *stateid,
+					  nfsstat4 status)
 {
 	clientid4 clientid;
 	uint32_t epoch;
 
+	if (data->minorversion == 0 || data->session == NULL)
+		return false;
+
+	if (status != NFS4ERR_BAD_STATEID && status != NFS4ERR_STALE_STATEID &&
+	    status != NFS4ERR_EXPIRED)
+		return false;
+
 	memcpy(&clientid, stateid->other, sizeof(clientid));
 	epoch = clientid >> (clientid4)32;
 
-	/* Leave the special stateids (all zeros, all ones) to the usual
-	 * checks.
-	 */
+	/* Leave the special stateids (all zeros, all ones) alone. */
 	if (epoch == 0 || epoch == UINT32_MAX)
 		return false;
 
-	if (epoch == (uint32_t)(get_unique_server_id() & 0xFFFFFFFF))
+	if (clientid == data->session->clientid)
 		return false;
 
 	return macos_quirk_applies(
@@ -133,21 +144,24 @@ enum nfs_req_result nfs4_op_delegreturn(struct nfs_argop4 *op,
 		return NFS_REQ_ERROR;
 	}
 
-#ifdef USE_MACOS_QUIRKS
-	if (data->minorversion > 0 &&
-	    return_stale_delegation_quirk(&arg_DELEGRETURN4->deleg_stateid)) {
-		LogInfo(COMPONENT_STATE,
-			"DELEGRETURN of a delegation from an earlier server instance, answering NFS4_OK");
-		res_DELEGRETURN4->status = NFS4_OK;
-		return NFS_REQ_OK;
-	}
-#endif
-
 	/* Check stateid correctness and get pointer to state */
 	res_DELEGRETURN4->status =
 		nfs4_Check_Stateid(&arg_DELEGRETURN4->deleg_stateid,
 				   data->current_obj, &state_found, data,
 				   STATEID_SPECIAL_FOR_LOCK, 0, false, tag);
+
+#ifdef USE_MACOS_QUIRKS
+	if (res_DELEGRETURN4->status != NFS4_OK &&
+	    return_stale_delegation_quirk(data,
+					  &arg_DELEGRETURN4->deleg_stateid,
+					  res_DELEGRETURN4->status)) {
+		LogInfo(COMPONENT_STATE,
+			"DELEGRETURN of a delegation of an earlier client ID got %s, answering NFS4_OK",
+			nfsstat4_to_str(res_DELEGRETURN4->status));
+		res_DELEGRETURN4->status = NFS4_OK;
+		return NFS_REQ_OK;
+	}
+#endif
 
 	if (res_DELEGRETURN4->status != NFS4_OK)
 		return NFS_REQ_ERROR;

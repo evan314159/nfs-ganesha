@@ -617,12 +617,15 @@ macOS_quirk_retry_delay(bool, default false)
     macOS_quirks_only_for_macOS_clients.
 
 macOS_quirk_return_stale_delegation(bool, default false)
-    Works around a macOS bug: after a server restart, macOS returns the
-    delegations it held before the restart, and the NFS4ERR_BAD_STATEID
-    answer makes its recovery thread wait for recovery, that is, for
-    itself, so the mount hangs. When set, an NFSv4.1 DELEGRETURN of a
-    stateid from an earlier server instance is answered with NFS4_OK; the
-    delegation no longer exists, so there is nothing to return. Follows
+    Works around a macOS bug: when macOS recovers with a new client ID
+    (after a server restart, or after its lease expired or state was
+    revoked), it returns the delegations it held under the earlier client
+    ID, and the NFS4ERR_BAD_STATEID answer makes its recovery thread wait
+    for recovery, that is, for itself, so the mount hangs. When set, an
+    NFSv4.1 DELEGRETURN of a stateid that fails its check and belongs to a
+    client ID other than the session's (including one from an earlier
+    server instance) is answered with NFS4_OK; the delegation no longer
+    exists, so there is nothing to return. Follows
     macOS_quirks_only_for_macOS_clients.
 
 macOS_quirk_late_reclaim(bool, default false)
