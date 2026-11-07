@@ -332,9 +332,7 @@ static int fs_ng_read_recov_clids_impl(const char *parent_path, char *clid_str)
 			memcpy(temp, ptr + 1, len);
 			temp[len] = '\0';
 			cid_len = atoi(temp);
-			len = strlen(ptr2);
-			if (cid_len > 0 && (len == (cid_len + 2)) &&
-			    (ptr2[len - 1] == ')')) {
+			if (fs_clid_complete(ptr2, cid_len)) {
 				new_ent = nfs4_add_clid_entry(build_clid, true);
 				LogDebugAlt(COMPONENT_CLIENTID,
 					    COMPONENT_RECOVERY,

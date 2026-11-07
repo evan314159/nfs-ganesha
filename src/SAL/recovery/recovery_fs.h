@@ -31,4 +31,5 @@ void fs_add_clid(nfs_client_id_t *clientid);
 void fs_rm_clid(nfs_client_id_t *clientid);
 void fs_add_revoke_fh(nfs_client_id_t *delr_clid, nfs_fh4 *delr_handle);
 void fs_clean_old_recov_dir_impl(char *parent_path);
+bool fs_clid_complete(const char *ptr2, int cid_len);
 #endif /* _RECOVERY_FS_H */

@@ -766,6 +766,35 @@ static void fs_cp_pop_revoked_delegs(clid_entry_t *clid_ent, char *path,
 	(void)closedir(dp);
 }
 
+/**
+ * @brief Check the length of a clid string read back from the recovery dir
+ *
+ * nfs4_create_clid_name() writes the client owner as (len:value), where len
+ * is the owner's length in bytes. A printable owner is written as is, so the
+ * value has len characters; any other owner (macOS's, for one) is written as
+ * hex, 0x followed by two characters per byte. A string that matches neither
+ * was cut short, for example by a crash.
+ *
+ * @param[in] ptr2     The clid string from its ':' on
+ * @param[in] cid_len  The length before the ':'
+ *
+ * @return true if the string is complete.
+ */
+bool fs_clid_complete(const char *ptr2, int cid_len)
+{
+	size_t len = strlen(ptr2);
+
+	if (cid_len <= 0 || len < 2 || ptr2[len - 1] != ')')
+		return false;
+
+	/* ":" + value + ")" */
+	if (len == (size_t)cid_len + 2)
+		return true;
+
+	/* ":0x" + 2 hex digits per byte + ")" */
+	return strncmp(ptr2, ":0x", 3) == 0 && len == 2 * (size_t)cid_len + 4;
+}
+
 bool process_recovery_entry(char *build_clid, char *tgtdir, int takeover,
 			    char *sub_path)
 {
@@ -824,9 +853,7 @@ bool process_recovery_entry(char *build_clid, char *tgtdir, int takeover,
 
 	cid_len = atoi(temp);
 
-	len = strlen(ptr2);
-
-	if ((len == (cid_len + 2)) && (ptr2[len - 1] == ')')) {
+	if (fs_clid_complete(ptr2, cid_len)) {
 		reclaim_complete = fs_check_reclaim_complete(sub_path);
 		new_ent = nfs4_add_clid_entry(build_clid, reclaim_complete);
 		fs_cp_pop_revoked_delegs(new_ent, sub_path, tgtdir, !takeover);
