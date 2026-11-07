@@ -341,6 +341,35 @@ bool init_deleg_heuristics(struct fsal_obj_handle *obj)
 	return true;
 }
 
+/**
+ * @brief Check whether a client holds any delegation on a file
+ *
+ * Counts delegations in every state, including ones being recalled: until
+ * the client returns it, it still has that stateid.
+ *
+ * @note The st_lock MUST be held
+ *
+ * @param[in] ostate File state to look in.
+ * @param[in] client The client.
+ */
+static bool client_has_deleg_on_file(struct state_hdl *ostate,
+				     nfs_client_id_t *client)
+{
+	struct glist_head *glist;
+	state_t *state;
+
+	/* get_delegation() makes the client's own owner the delegation's */
+	glist_for_each(glist, &ostate->file.list_of_states) {
+		state = glist_entry(glist, state_t, state_list);
+
+		if (state->state_type == STATE_TYPE_DELEG &&
+		    state->state_owner == &client->cid_owner)
+			return true;
+	}
+
+	return false;
+}
+
 /* Most clients retry NFS operations after 5 seconds. The following
  * should be good enough to avoid starving a client's open
  */
@@ -435,6 +464,23 @@ bool should_we_grant_deleg(struct state_hdl *ostate, nfs_client_id_t *client,
 		default:
 			break;
 		}
+	}
+
+	/* Never give a client a second delegation on a file it already holds
+	 * one on, as Linux knfsd also refuses. Clients keep one delegation
+	 * stateid per file: the macOS client overwrites it with the new one,
+	 * then answers every recall of the old one with NFS4ERR_BAD_STATEID
+	 * until it is revoked, and the revoke sends it into recovery.
+	 */
+	if (client_has_deleg_on_file(ostate, client)) {
+		LogFullDebug(
+			COMPONENT_STATE,
+			"Not granting delegation: client already holds one");
+		resok->delegation.open_delegation4_u.od_whynone.ond_why =
+			(args->share_access & OPEN4_SHARE_ACCESS_WRITE)
+				? WND4_NOT_SUPP_UPGRADE
+				: WND4_CONTENTION;
+		return false;
 	}
 
 	/* If there is a recent recall on this file, the client that made
