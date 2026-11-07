@@ -45,6 +45,7 @@
 #include "nfs_creds.h"
 #include "pnfs_utils.h"
 #include <time.h>
+#include <unistd.h>
 #include "nfs_qos.h"
 
 #include "gsh_lttng/gsh_lttng.h"
@@ -742,6 +743,73 @@ out:
 	return result;
 }
 
+#ifdef USE_MACOS_QUIRKS
+/**
+ * @brief Whether to re-run an op that returned NFS4ERR_DELAY
+ *
+ * macOS mishandles NFS4ERR_DELAY on NFSv4.1: nfs_request_finish() frees the
+ * reply and asks for a restart, but nfs_request2() then parses the missing
+ * reply's SEQUENCE and fails with EBADRPC, which the application sees. So
+ * with macOS_quirk_retry_delay we wait for the conflict (usually a
+ * delegation recall or a CB_GETATTR, which finish within milliseconds) and
+ * re-run the op, sending NFS4ERR_DELAY only if it is still there after
+ * MACOS_RETRY_DELAY_MAX_MS.
+ *
+ * These ops change nothing before they return NFS4ERR_DELAY, so re-running
+ * them is safe.
+ *
+ * @todo Remove once macOS is fixed.
+ */
+#define MACOS_RETRY_DELAY_MAX_MS 2000
+
+static bool retry_delay_quirk(compound_data_t *data, nfs_resop4 *thisres,
+			      uint32_t *waited_ms)
+{
+	uint32_t sleep_ms;
+
+	if (data->minorversion == 0 ||
+	    thisres->nfs_resop4_u.opaccess.status != NFS4ERR_DELAY)
+		return false;
+
+	switch (data->opcode) {
+	case NFS4_OP_GETATTR:
+	case NFS4_OP_OPEN:
+	case NFS4_OP_SETATTR:
+	case NFS4_OP_REMOVE:
+	case NFS4_OP_RENAME:
+	case NFS4_OP_LINK:
+		break;
+	default:
+		return false;
+	}
+
+	if (*waited_ms >= MACOS_RETRY_DELAY_MAX_MS ||
+	    !macos_quirk_applies(nfs_param.nfsv4_param.macos_quirk_retry_delay))
+		return false;
+
+	/* Sleep 5, 5, 10, 20, 40, 80, then 100 ms at a time. */
+	sleep_ms = *waited_ms < 5 ? 5 : *waited_ms;
+	if (sleep_ms > 100)
+		sleep_ms = 100;
+	if (sleep_ms > MACOS_RETRY_DELAY_MAX_MS - *waited_ms)
+		sleep_ms = MACOS_RETRY_DELAY_MAX_MS - *waited_ms;
+
+	LogDebug(COMPONENT_NFS_V4,
+		 "%s in position %d got NFS4ERR_DELAY, retrying in %" PRIu32
+		 " ms (waited %" PRIu32 " ms)",
+		 data->opname, data->oppos, sleep_ms, *waited_ms);
+
+	optabv4[data->opcode].free_res(thisres);
+	memset(thisres, 0, sizeof(*thisres));
+	thisres->resop = data->opcode;
+	data->op_resp_size = optabv4[data->opcode].resp_size;
+
+	usleep(sleep_ms * 1000);
+	*waited_ms += sleep_ms;
+	return true;
+}
+#endif
+
 enum nfs_req_result process_one_op(compound_data_t *data, nfsstat4 *status)
 {
 	const char *bad_op_state_reason = "";
@@ -909,7 +977,27 @@ bad_op_state:
 			    "v4 op start. op pos: {}, op: {}", data->oppos,
 			    data->opcode);
 
+#ifdef USE_MACOS_QUIRKS
+	{
+		uint32_t waited_ms = 0;
+
+		do {
+			result = (optabv4[data->opcode].funct)(thisarg, data,
+							       thisres);
+		} while (result != NFS_REQ_ASYNC_WAIT &&
+			 retry_delay_quirk(data, thisres, &waited_ms));
+
+		if (waited_ms != 0)
+			LogInfo(COMPONENT_NFS_V4,
+				"%s got NFS4ERR_DELAY; after waiting %" PRIu32
+				" ms the status is %s",
+				data->opname, waited_ms,
+				nfsstat4_to_str(
+					thisres->nfs_resop4_u.opaccess.status));
+	}
+#else
 	result = (optabv4[data->opcode].funct)(thisarg, data, thisres);
+#endif
 
 	if (result != NFS_REQ_ASYNC_WAIT) {
 		/* Complete the operation, otherwise return without doing
