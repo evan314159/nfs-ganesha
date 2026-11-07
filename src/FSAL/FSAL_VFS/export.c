@@ -340,6 +340,7 @@ void vfs_export_ops_init(struct export_ops *ops)
 	ops->get_quota = get_quota;
 	ops->set_quota = set_quota;
 	ops->alloc_state = vfs_alloc_state;
+	ops->fs_deleg_recall_limit = vfs_fs_deleg_recall_limit;
 	ops->get_fsal_obj_hdl = get_fsal_obj_hdl;
 }
 

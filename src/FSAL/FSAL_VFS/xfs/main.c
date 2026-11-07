@@ -178,6 +178,16 @@ static fsal_status_t init_config(struct fsal_module *xfs_fsal_module,
 	else
 		LogInfo(COMPONENT_FSAL, "FSAL_XFS disabling lock support");
 
+	/* Delegations need kernel delegations (F_SETDELEG, Linux 6.19) */
+	if (vfs_deleg_supported()) {
+		xfs_module->module.fs_info.delegations =
+			FSAL_OPTION_FILE_DELEGATIONS;
+		LogInfo(COMPONENT_FSAL, "FSAL_XFS enabling delegations");
+	} else {
+		LogInfo(COMPONENT_FSAL,
+			"FSAL_XFS disabling delegations, no kernel support");
+	}
+
 	LogFullDebug(COMPONENT_FSAL,
 		     "Supported attributes default = 0x%" PRIx64,
 		     xfs_module->module.fs_info.supported_attrs);

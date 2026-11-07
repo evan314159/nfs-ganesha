@@ -1313,6 +1313,12 @@ VFS {}
 		* NFSv4 named attributes, stored as "user." extended
 		  attributes. Linux only; see ganesha-vfs-config(8).
 
+	VFS grants NFSv4 delegations, when Delegations in NFSV4 and in
+	the export allow them, on Linux 6.19 or later. A process on the
+	server that conflicts with one waits up to fs.lease-break-time
+	(45 seconds) for the client to return it; see DELEGATIONS in
+	ganesha-vfs-config(8).
+
 XFS {}
 ------
 

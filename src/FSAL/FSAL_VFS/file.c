@@ -127,6 +127,7 @@ fsal_status_t vfs_reopen_func(struct fsal_obj_handle *obj_hdl,
 	fsal_errors_t fsal_error = ERR_FSAL_NO_ERROR;
 	int retval = 0;
 	int posix_flags = 0;
+	bool suspended = false;
 
 	myself = container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
 	my_fd = container_of(fsal_fd, struct vfs_fd, fsal_fd);
@@ -137,7 +138,21 @@ fsal_status_t vfs_reopen_func(struct fsal_obj_handle *obj_hdl,
 		     "my_fd->fd = %d openflags = %x, posix_flags = %x",
 		     my_fd->fd, openflags, posix_flags);
 
-	fd = vfs_fsal_open(myself, posix_flags, &fsal_error);
+	/* Opening a delegated file again could break Ganesha's own delegations,
+	 * and the kernel won't give back a write delegation while the file has
+	 * a second open. A dup() of a delegation's fd isn't a new open, so use
+	 * one if it allows the access we need. Truncating needs a real open
+	 * with O_TRUNC, so in that case release the kernel delegations around
+	 * the open instead.
+	 */
+	fd = (openflags & FSAL_O_TRUNC) ? -1
+					: vfs_deleg_dup_fd(myself, openflags);
+
+	if (fd < 0) {
+		vfs_deleg_suspend(myself);
+		suspended = true;
+		fd = vfs_fsal_open(myself, posix_flags, &fsal_error);
+	}
 
 	if (fd < 0) {
 		retval = -fd;
@@ -168,6 +183,9 @@ fsal_status_t vfs_reopen_func(struct fsal_obj_handle *obj_hdl,
 		my_fd->fd = fd;
 		my_fd->fsal_fd.openflags = FSAL_O_NFS_FLAGS(openflags);
 	}
+
+	if (suspended)
+		vfs_deleg_resume(myself);
 
 	return fsalstat(fsal_error, retval);
 }
@@ -1154,6 +1172,31 @@ fsal_status_t find_fd(struct fsal_fd **out_fd, struct fsal_obj_handle *obj_hdl,
 
 	myself = container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
 
+	/* With no state, or a delegation's state, try a dup() of a delegation's
+	 * fd instead of opening the file again, which could break Ganesha's own
+	 * delegations (see deleg.c). For a delegation state this also covers
+	 * the client having closed the open the delegation was granted with.
+	 * With no state we only do this for FSAL_O_ANY (COMMIT and getattrs),
+	 * because anonymous READ and WRITE need the share reservation check in
+	 * fsal_start_io(), which this would skip.
+	 */
+	if (obj_hdl->type == REGULAR_FILE &&
+	    ((state == NULL && openflags == FSAL_O_ANY) ||
+	     (state != NULL && state->state_type == STATE_TYPE_DELEG))) {
+		rc = vfs_deleg_dup_fd(myself, openflags);
+
+		if (rc >= 0) {
+			my_fd = container_of(tmp_fd, struct vfs_fd, fsal_fd);
+			my_fd->fd = rc;
+			my_fd->fsal_fd.openflags = FSAL_O_NFS_FLAGS(
+				openflags == FSAL_O_ANY ? FSAL_O_READ
+							: openflags);
+			tmp_fd->close_on_complete = true;
+			*out_fd = tmp_fd;
+			return status;
+		}
+	}
+
 	if (obj_hdl->type == REGULAR_FILE) {
 		status = fsal_start_io(out_fd, obj_hdl,
 				       &myself->u.file.fd.fsal_fd, tmp_fd,
@@ -1293,10 +1336,12 @@ void vfs_read2(struct fsal_obj_handle *obj_hdl, bool bypass,
 		goto exit;
 	}
 
-	/* Indicate a desire to start io and get a usable file descritor */
-	status = fsal_start_io(&out_fd, obj_hdl, &myself->u.file.fd.fsal_fd,
-			       &temp_fd.fsal_fd, read_arg->state, FSAL_O_READ,
-			       false, NULL, bypass, &myself->u.file.share);
+	/* Get a usable file descriptor. With a delegation stateid, find_fd()
+	 * uses the delegation's fd, which stays open even if the client has
+	 * closed the open the delegation came from.
+	 */
+	status = find_fd(&out_fd, obj_hdl, &temp_fd.fsal_fd, read_arg->state,
+			 FSAL_O_READ, bypass);
 
 	if (FSAL_IS_ERROR(status)) {
 		LogFullDebug(COMPONENT_FSAL,
@@ -1388,10 +1433,9 @@ void vfs_write2(struct fsal_obj_handle *obj_hdl, bool bypass,
 		goto exit;
 	}
 
-	/* Indicate a desire to start io and get a usable file descritor */
-	status = fsal_start_io(&out_fd, obj_hdl, &myself->u.file.fd.fsal_fd,
-			       &temp_fd.fsal_fd, write_arg->state, FSAL_O_WRITE,
-			       false, NULL, bypass, &myself->u.file.share);
+	/* Get a usable file descriptor, as in vfs_read2() */
+	status = find_fd(&out_fd, obj_hdl, &temp_fd.fsal_fd, write_arg->state,
+			 FSAL_O_WRITE, bypass);
 
 	if (FSAL_IS_ERROR(status)) {
 		LogFullDebug(COMPONENT_FSAL,
@@ -1598,10 +1642,9 @@ fsal_status_t vfs_fallocate(struct fsal_obj_handle *obj_hdl,
 
 	myself = container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
 
-	/* Indicate a desire to start io and get a usable file descritor */
-	status = fsal_start_io(&out_fd, obj_hdl, &myself->u.file.fd.fsal_fd,
-			       &temp_fd.fsal_fd, state, FSAL_O_WRITE, false,
-			       NULL, false, &myself->u.file.share);
+	/* Get a usable file descriptor, as in vfs_read2() */
+	status = find_fd(&out_fd, obj_hdl, &temp_fd.fsal_fd, state,
+			 FSAL_O_WRITE, false);
 
 	if (FSAL_IS_ERROR(status)) {
 		LogFullDebug(COMPONENT_FSAL,
@@ -1678,22 +1721,19 @@ exit:
 fsal_status_t vfs_commit2(struct fsal_obj_handle *obj_hdl, off_t offset,
 			  size_t len)
 {
-	struct vfs_fsal_obj_handle *myself;
 	fsal_status_t status, status2;
 	int retval;
 	struct vfs_fd temp_fd = { FSAL_FD_INIT, -1 };
 	struct fsal_fd *out_fd;
 	struct vfs_fd *my_fd;
 
-	myself = container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
-
-	/* Make sure file is open in appropriate mode.
-	 * Do not check share reservation.
+	/* Make sure file is open in appropriate mode. Do not check share
+	 * reservation. On a delegated file, find_fd() uses a dup() of the
+	 * delegation's fd, because opening the file again would stop the kernel
+	 * giving the write delegation back.
 	 */
-	status = fsal_start_global_io(&out_fd, obj_hdl,
-				      &myself->u.file.fd.fsal_fd,
-				      &temp_fd.fsal_fd, FSAL_O_ANY, false,
-				      NULL);
+	status = find_fd(&out_fd, obj_hdl, &temp_fd.fsal_fd, NULL, FSAL_O_ANY,
+			 false);
 
 	if (FSAL_IS_ERROR(status))
 		return status;
@@ -2040,9 +2080,9 @@ exit:
  *
  * @return FSAL status.
  */
-fsal_status_t vfs_setattr2(struct fsal_obj_handle *obj_hdl, bool bypass,
-			   struct state_t *state,
-			   struct fsal_attrlist *attrib_set)
+static fsal_status_t do_setattr2(struct fsal_obj_handle *obj_hdl, bool bypass,
+				 struct state_t *state,
+				 struct fsal_attrlist *attrib_set)
 {
 	struct vfs_fsal_obj_handle *myself;
 	fsal_status_t status = { 0, 0 }, status2;
@@ -2341,6 +2381,24 @@ out:
 	}
 
 exit:
+
+	return status;
+}
+
+fsal_status_t vfs_setattr2(struct fsal_obj_handle *obj_hdl, bool bypass,
+			   struct state_t *state,
+			   struct fsal_attrlist *attrib_set)
+{
+	struct vfs_fsal_obj_handle *myself =
+		container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
+	fsal_status_t status;
+
+	/* Release the kernel delegations while we change the file, or the
+	 * change would break Ganesha's own delegations (see deleg.c).
+	 */
+	vfs_deleg_suspend(myself);
+	status = do_setattr2(obj_hdl, bypass, state, attrib_set);
+	vfs_deleg_resume(myself);
 
 	return status;
 }

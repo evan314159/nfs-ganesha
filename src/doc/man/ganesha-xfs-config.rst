@@ -46,6 +46,13 @@ XFS {}
 **named_attr(bool, default false)**
     As for VFS: see :doc:`ganesha-vfs-config <ganesha-vfs-config>`\(8).
 
+DELEGATIONS
+==========================================================
+
+On Linux 6.19 and later, FSAL_XFS can grant NFSv4 read and write delegations,
+as FSAL_VFS does: see DELEGATIONS in
+:doc:`ganesha-vfs-config <ganesha-vfs-config>`\(8).
+
 See also
 ==============================
 :doc:`ganesha-log-config <ganesha-log-config>`\(8)
