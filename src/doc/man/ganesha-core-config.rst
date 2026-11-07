@@ -607,6 +607,16 @@ macOS_quirk_retry_delay(bool, default false)
     sent. This holds a worker thread while it waits. Follows
     macOS_quirks_only_for_macOS_clients.
 
+macOS_quirk_late_reclaim(bool, default false)
+    Works around a macOS bug: after a server restart, macOS sends
+    RECLAIM_COMPLETE before it reclaims its state, so its reclaims get
+    NFS4ERR_NO_GRACE and it loses every file that held a byte-range lock or
+    a deny-mode open. When set, an NFSv4.1 OPEN with CLAIM_PREVIOUS is
+    accepted after the client's RECLAIM_COMPLETE, as long as the server is
+    still in its grace period and the client was in the recovery records.
+    Lock reclaims are already accepted in that case. Follows
+    macOS_quirks_only_for_macOS_clients.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 
