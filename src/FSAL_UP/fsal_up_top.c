@@ -1448,9 +1448,17 @@ static void delegrevoke_check(void *ctx)
 	used_ctx = true;
 
 	if (eval_deleg_revoke(state)) {
-		if (str_valid)
-			LogDebug(COMPONENT_STATE, "Revoking delegation for %s",
-				 str);
+		/* The client accepted the recall but never returned the
+		 * delegation. Say so as loudly as the other revoke paths:
+		 * a revoke can leave a client stuck in recovery.
+		 */
+		if (!str_valid)
+			display_stateid(&dspbuf, state);
+
+		LogCrit(COMPONENT_STATE,
+			"Revoking delegation the client did not return after a recall for %s",
+			str);
+		str_valid = true;
 
 		/* state_del_locked is called from deleg_revoke,
 		 * take the lock.
@@ -1459,17 +1467,12 @@ static void delegrevoke_check(void *ctx)
 		rc = deleg_revoke(obj, state);
 		STATELOCK_unlock(obj);
 
-		if (rc != NFS4_OK) {
-			if (!str_valid)
-				display_stateid(&dspbuf, state);
-
+		if (rc != NFS4_OK)
 			LogCrit(COMPONENT_NFS_V4,
 				"Delegation could not be revoked for %s", str);
-		} else {
-			if (str_valid)
-				LogDebug(COMPONENT_NFS_V4,
-					 "Delegation revoked for %s", str);
-		}
+		else
+			LogDebug(COMPONENT_NFS_V4, "Delegation revoked for %s",
+				 str);
 	} else {
 		if (str_valid)
 			LogFullDebug(COMPONENT_STATE,
