@@ -941,18 +941,15 @@ static struct config_item version4_params[] = {
 	CONF_ITEM_BOOL("macOS_quirk_pad_handles", false, nfs_version4_parameter,
 		       macos_quirk_pad_handles),
 	/* @todo Remove once macOS is fixed. */
-	CONF_ITEM_BOOL("macOS_quirk_free_anonymous_stateid", false,
-		       nfs_version4_parameter,
-		       macos_quirk_free_anonymous_stateid),
-	/* @todo Remove once macOS is fixed. */
 	CONF_ITEM_BOOL("macOS_quirk_rebind_backchannel", false,
 		       nfs_version4_parameter, macos_quirk_rebind_backchannel),
 	/* @todo Remove once macOS is fixed. */
 	CONF_ITEM_BOOL("macOS_quirk_retry_delay", false, nfs_version4_parameter,
 		       macos_quirk_retry_delay),
 	/* @todo Remove once macOS is fixed. */
-	CONF_ITEM_BOOL("macOS_quirk_stale_stateid", false,
-		       nfs_version4_parameter, macos_quirk_stale_stateid),
+	CONF_ITEM_BOOL("macOS_quirk_return_stale_delegation", false,
+		       nfs_version4_parameter,
+		       macos_quirk_return_stale_delegation),
 	/* @todo Remove once macOS is fixed. */
 	CONF_ITEM_BOOL("macOS_quirk_late_reclaim", false,
 		       nfs_version4_parameter, macos_quirk_late_reclaim),

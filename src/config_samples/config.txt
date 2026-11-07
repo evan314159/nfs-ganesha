@@ -325,16 +325,13 @@ NFSV4 {}
 	macOS_quirk_pad_handles(bool, default false)
 		* macOS client workaround; see ganesha-core-config(8).
 
-	macOS_quirk_free_anonymous_stateid(bool, default false)
-		* macOS client workaround; see ganesha-core-config(8).
-
 	macOS_quirk_rebind_backchannel(bool, default false)
 		* macOS client workaround; see ganesha-core-config(8).
 
 	macOS_quirk_retry_delay(bool, default false)
 		* macOS client workaround; see ganesha-core-config(8).
 
-	macOS_quirk_stale_stateid(bool, default false)
+	macOS_quirk_return_stale_delegation(bool, default false)
 		* macOS client workaround; see ganesha-core-config(8).
 
 	macOS_quirk_late_reclaim(bool, default false)

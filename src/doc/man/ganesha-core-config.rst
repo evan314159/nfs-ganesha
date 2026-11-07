@@ -586,15 +586,6 @@ macOS_quirk_pad_handles(bool, default false)
     This ignores macOS_quirks_only_for_macOS_clients and applies to every
     client, because callbacks send handles without knowing the client.
 
-macOS_quirk_free_anonymous_stateid(bool, default false)
-    Works around a macOS bug: a lock macOS takes under a write delegation
-    stays local, so its lock owner never gets a stateid, yet when the file
-    is closed macOS sends FREE_STATEID for it with the anonymous (all-zero)
-    stateid. The NFS4ERR_BAD_STATEID reply sends macOS into state recovery,
-    which waits on the close still in progress, so the mount hangs. When
-    set, FREE_STATEID of the anonymous stateid succeeds, since it frees
-    nothing. Follows macOS_quirks_only_for_macOS_clients.
-
 macOS_quirk_rebind_backchannel(bool, default false)
     Works around a macOS bug: macOS has no BIND_CONN_TO_SESSION, so after
     it reconnects, its session has no backchannel and SEQUENCE answers
@@ -616,21 +607,17 @@ macOS_quirk_retry_delay(bool, default false)
     sent. This holds a worker thread while it waits. Follows
     macOS_quirks_only_for_macOS_clients.
 
-macOS_quirk_stale_stateid(bool, default false)
-    Works around macOS bugs in how it recovers its state under a new client
-    ID (after a server restart, or after its lease expired or its state was
-    revoked). It returns the delegations it held under the earlier client
-    ID, and resends the requests it had in flight unchanged, still carrying
-    the earlier client ID's stateids. The NFS4ERR_BAD_STATEID answers make
-    it wait for recovery (in the recovery thread itself, for the
-    DELEGRETURN) or recover again, so the mount hangs or loops through
-    recovery. When set, an NFSv4.1 DELEGRETURN of such a stateid is
-    answered with NFS4_OK, since the delegation no longer exists, and any
-    other operation gets NFS4ERR_OLD_STATEID, which makes macOS rebuild the
-    request with its current stateid. A stateid of an earlier server
-    instance gets NFS4ERR_OLD_STATEID only once the client has recovered
-    (it sent a second RECLAIM_COMPLETE); before that, NFS4ERR_BAD_STATEID
-    still starts its recovery. Follows macOS_quirks_only_for_macOS_clients.
+macOS_quirk_return_stale_delegation(bool, default false)
+    Works around a macOS bug: when macOS recovers with a new client ID
+    (after a server restart, or after its lease expired or state was
+    revoked), it returns the delegations it held under the earlier client
+    ID, and the NFS4ERR_BAD_STATEID answer makes its recovery thread wait
+    for recovery, that is, for itself, so the mount hangs. When set, an
+    NFSv4.1 DELEGRETURN of a stateid that fails its check and belongs to a
+    client ID other than the session's (including one from an earlier
+    server instance) is answered with NFS4_OK; the delegation no longer
+    exists, so there is nothing to return. RFC 8881 and Linux knfsd answer
+    NFS4ERR_BAD_STATEID. Follows macOS_quirks_only_for_macOS_clients.
 
 macOS_quirk_late_reclaim(bool, default false)
     Works around a macOS bug: after a server restart, macOS sends

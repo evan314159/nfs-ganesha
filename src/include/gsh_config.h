@@ -720,10 +720,6 @@ typedef struct nfs_version4_parameter {
 	    macOS_quirk_pad_handles.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_pad_handles;
-	/** Accept FREE_STATEID of the anonymous (all-zero) stateid.
-	    Settable with macOS_quirk_free_anonymous_stateid.
-	    @todo Remove once macOS is fixed. */
-	bool macos_quirk_free_anonymous_stateid;
 	/** Rebind a lost backchannel to the connection a SEQUENCE comes on.
 	    Settable with macOS_quirk_rebind_backchannel.
 	    @todo Remove once macOS is fixed. */
@@ -732,11 +728,11 @@ typedef struct nfs_version4_parameter {
 	    Settable with macOS_quirk_retry_delay.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_retry_delay;
-	/** Answer a stateid of an earlier client ID or server instance with
-	    NFS4_OK for DELEGRETURN, NFS4ERR_OLD_STATEID otherwise. Settable
-	    with macOS_quirk_stale_stateid.
+	/** Answer NFS4_OK to DELEGRETURN of a delegation of an earlier
+	    client ID or server instance. Settable with
+	    macOS_quirk_return_stale_delegation.
 	    @todo Remove once macOS is fixed. */
-	bool macos_quirk_stale_stateid;
+	bool macos_quirk_return_stale_delegation;
 	/** Accept an NFSv4.1 reclaim in grace after the client's
 	    RECLAIM_COMPLETE. Settable with macOS_quirk_late_reclaim.
 	    @todo Remove once macOS is fixed. */

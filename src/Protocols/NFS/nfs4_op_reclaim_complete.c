@@ -118,17 +118,6 @@ enum nfs_req_result nfs4_op_reclaim_complete(struct nfs_argop4 *op,
 	res_RECLAIM_COMPLETE4->rcr_status = NFS4_OK;
 
 #ifdef USE_MACOS_QUIRKS
-	/* macOS sends a RECLAIM_COMPLETE when it reconnects and another at the
-	 * end of each nfs_recover(); a second one means recovery has run
-	 * (see macOS_quirk_stale_stateid in nfs4_state_id.c).
-	 */
-	if (clientid->cid_cb.v41.cid_reclaim_complete &&
-	    !arg_RECLAIM_COMPLETE4->rca_one_fs && !clientid->cid_recovered) {
-		clientid->cid_recovered = true;
-		LogDebug(COMPONENT_CLIENTID,
-			 "Client finished recovery (second RECLAIM_COMPLETE)");
-	}
-
 	/* The RECLAIM_COMPLETE macOS sends when nfs_recover() is done; count
 	 * it now (see early_reclaim_complete_quirk()).
 	 */
