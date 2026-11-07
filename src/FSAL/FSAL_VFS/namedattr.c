@@ -183,11 +183,24 @@ static const char *attr_from_xname(const char *xname)
 /**
  * @brief Open the object the named attributes belong to
  *
+ * If a client has a write delegation on the file, opening it again would
+ * break Ganesha's own kernel delegation, and the open would wait until the
+ * client returned it. So use a dup() of the delegation's fd instead.
+ *
  * @return An fd, or -errno.
  */
 static int attr_open_parent(struct vfs_attr_handle *hdl,
 			    fsal_errors_t *fsal_error)
 {
+	int fd;
+
+	if (!hdl->parent_is_dir) {
+		fd = vfs_deleg_dup_fd_handle(&hdl->parent);
+
+		if (fd >= 0)
+			return fd;
+	}
+
 	return vfs_open_by_handle(hdl->obj_handle.fs, &hdl->parent,
 				  hdl->parent_is_dir ? O_RDONLY | O_DIRECTORY
 						     : O_RDONLY,
@@ -765,6 +778,7 @@ static fsal_status_t attr_dir_unlink(
 	fsal_errors_t fsal_error = ERR_FSAL_NO_ERROR;
 	char xname[XATTR_NAME_MAX + 1];
 	int fd, rc, err;
+	bool suspended;
 
 	err = attr_xname(name, xname, sizeof(xname));
 
@@ -781,8 +795,12 @@ static fsal_status_t attr_dir_unlink(
 		return posix2fsal_status(EPERM);
 	}
 
+	/* See named_attr_update() about delegations */
+	suspended = vfs_deleg_suspend_handle(&dir->parent);
 	rc = fremovexattr(fd, xname);
 	err = errno;
+	if (suspended)
+		vfs_deleg_resume_handle(&dir->parent);
 
 	vfs_restore_ganesha_credentials(dir_hdl->fsal);
 	close(fd);
@@ -827,6 +845,7 @@ attr_dir_open2(struct fsal_obj_handle *dir_hdl, struct state_t *state,
 	fsal_status_t status;
 	bool exists, created = false;
 	int fd, rc, err;
+	bool suspended;
 
 	*new_obj = NULL;
 
@@ -872,8 +891,12 @@ attr_dir_open2(struct fsal_obj_handle *dir_hdl, struct state_t *state,
 			goto out;
 		}
 
+		/* See named_attr_update() about delegations */
+		suspended = vfs_deleg_suspend_handle(&dir->parent);
 		rc = fsetxattr(fd, xname, "", 0, 0);
 		err = errno;
+		if (suspended)
+			vfs_deleg_resume_handle(&dir->parent);
 
 		vfs_restore_ganesha_credentials(dir_hdl->fsal);
 
@@ -1207,6 +1230,7 @@ static fsal_status_t named_attr_update(struct vfs_attr_handle *hdl,
 	char *value = NULL;
 	size_t len = 0, count = 0, newlen;
 	int fd, err, rc, i;
+	bool suspended;
 
 	err = attr_xname(hdl->name, xname, sizeof(xname));
 
@@ -1268,8 +1292,15 @@ static fsal_status_t named_attr_update(struct vfs_attr_handle *hdl,
 		goto out;
 	}
 
+	/* Changing an xattr breaks the kernel delegations on the file, even
+	 * ours. Release them around the change, as for any other change a
+	 * client makes, so the client keeps its NFS delegation.
+	 */
+	suspended = vfs_deleg_suspend_handle(&hdl->parent);
 	rc = fsetxattr(fd, xname, value, newlen, XATTR_REPLACE);
 	err = errno;
+	if (suspended)
+		vfs_deleg_resume_handle(&hdl->parent);
 
 	vfs_restore_ganesha_credentials(hdl->obj_handle.fsal);
 
@@ -1433,6 +1464,21 @@ static bool same_attr_dir(struct vfs_attr_handle *hdl,
 }
 
 /**
+ * @brief Delegate a named attribute: not implemented
+ *
+ * SAL offers delegations on named attributes like on any other file. They
+ * could be backed by a kernel delegation on the file they belong to, since
+ * changing its xattrs breaks that, but it isn't done. Saying no here keeps the
+ * default method from logging a CRIT each time.
+ */
+static fsal_status_t named_attr_lease_op2(struct fsal_obj_handle *obj_hdl,
+					  struct state_t *state, void *owner,
+					  fsal_deleg_t deleg)
+{
+	return fsalstat(ERR_FSAL_NOTSUPP, 0);
+}
+
+/**
  * @brief Link a named attribute: not supported
  *
  * RFC 8881 18.9.3 requires NFS4ERR_XDEV for a link into any other directory.
@@ -1500,6 +1546,7 @@ static void attr_ops_init(void)
 	named_attr_ops.commit2 = named_attr_commit2;
 	named_attr_ops.setattr2 = named_attr_setattr2;
 	named_attr_ops.link = named_attr_link;
+	named_attr_ops.lease_op2 = named_attr_lease_op2;
 }
 
 /**

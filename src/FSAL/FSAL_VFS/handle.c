@@ -181,6 +181,7 @@ struct vfs_fsal_obj_handle *alloc_handle(int dirfd, vfs_file_handle_t *fh,
 		init_fsal_fd(&hdl->u.file.fd.fsal_fd, FSAL_FD_GLOBAL,
 			     op_ctx->fsal_export);
 		hdl->u.file.fd.fd = -1; /* no open on this yet */
+		glist_init(&hdl->u.file.delegs);
 	} else if (hdl->obj_handle.type == SYMBOLIC_LINK) {
 		ssize_t retlink;
 		size_t len = stat->st_size;
@@ -1243,11 +1244,11 @@ out:
 	return fsalstat(fsal_error, retval);
 }
 
-static fsal_status_t linkfile(struct fsal_obj_handle *obj_hdl,
-			      struct fsal_obj_handle *destdir_hdl,
-			      const char *name,
-			      struct fsal_attrlist *destdir_pre_attrs_out,
-			      struct fsal_attrlist *destdir_post_attrs_out)
+static fsal_status_t do_linkfile(struct fsal_obj_handle *obj_hdl,
+				 struct fsal_obj_handle *destdir_hdl,
+				 const char *name,
+				 struct fsal_attrlist *destdir_pre_attrs_out,
+				 struct fsal_attrlist *destdir_post_attrs_out)
 {
 	struct vfs_fsal_obj_handle *myself, *destdir;
 	int destdirfd;
@@ -1596,15 +1597,15 @@ out:
 	return status;
 }
 
-static fsal_status_t renamefile(struct fsal_obj_handle *obj_hdl,
-				struct fsal_obj_handle *olddir_hdl,
-				const char *old_name,
-				struct fsal_obj_handle *newdir_hdl,
-				const char *new_name,
-				struct fsal_attrlist *olddir_pre_attrs_out,
-				struct fsal_attrlist *olddir_post_attrs_out,
-				struct fsal_attrlist *newdir_pre_attrs_out,
-				struct fsal_attrlist *newdir_post_attrs_out)
+static fsal_status_t do_renamefile(struct fsal_obj_handle *obj_hdl,
+				   struct fsal_obj_handle *olddir_hdl,
+				   const char *old_name,
+				   struct fsal_obj_handle *newdir_hdl,
+				   const char *new_name,
+				   struct fsal_attrlist *olddir_pre_attrs_out,
+				   struct fsal_attrlist *olddir_post_attrs_out,
+				   struct fsal_attrlist *newdir_pre_attrs_out,
+				   struct fsal_attrlist *newdir_post_attrs_out)
 {
 	struct vfs_fsal_obj_handle *olddir, *newdir, *obj;
 	int oldfd = -1, newfd = -1;
@@ -1713,11 +1714,11 @@ out:
  * unlink the named file in the directory
  */
 
-static fsal_status_t file_unlink(struct fsal_obj_handle *dir_hdl,
-				 struct fsal_obj_handle *obj_hdl,
-				 const char *name,
-				 struct fsal_attrlist *parent_pre_attrs_out,
-				 struct fsal_attrlist *parent_post_attrs_out)
+static fsal_status_t do_file_unlink(struct fsal_obj_handle *dir_hdl,
+				    struct fsal_obj_handle *obj_hdl,
+				    const char *name,
+				    struct fsal_attrlist *parent_pre_attrs_out,
+				    struct fsal_attrlist *parent_post_attrs_out)
 {
 	struct vfs_fsal_obj_handle *myself;
 	fsal_errors_t fsal_error = ERR_FSAL_NO_ERROR;
@@ -1843,6 +1844,8 @@ static void release(struct fsal_obj_handle *obj_hdl)
 	if (type == REGULAR_FILE) {
 		fsal_status_t st;
 
+		vfs_deleg_release(myself);
+
 		st = close_fsal_fd(obj_hdl, &myself->u.file.fd.fsal_fd, false);
 
 		if (FSAL_IS_ERROR(st)) {
@@ -1902,9 +1905,9 @@ static fsal_status_t vfs_getxattrs(struct fsal_obj_handle *obj_hdl,
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-static fsal_status_t vfs_setxattrs(struct fsal_obj_handle *obj_hdl,
-				   setxattr_option4 option, xattrkey4 *xa_name,
-				   xattrvalue4 *xa_value)
+static fsal_status_t do_vfs_setxattrs(struct fsal_obj_handle *obj_hdl,
+				      setxattr_option4 option,
+				      xattrkey4 *xa_name, xattrvalue4 *xa_value)
 {
 	struct vfs_fsal_obj_handle *myself =
 		container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
@@ -1961,8 +1964,8 @@ static fsal_status_t vfs_setxattrs(struct fsal_obj_handle *obj_hdl,
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-static fsal_status_t vfs_removexattrs(struct fsal_obj_handle *obj_hdl,
-				      xattrkey4 *xa_name)
+static fsal_status_t do_vfs_removexattrs(struct fsal_obj_handle *obj_hdl,
+					 xattrkey4 *xa_name)
 {
 	struct vfs_fsal_obj_handle *myself =
 		container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
@@ -2000,6 +2003,141 @@ static fsal_status_t vfs_removexattrs(struct fsal_obj_handle *obj_hdl,
 		}
 	}
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
+}
+
+/* These wrappers are for the operations that break kernel delegations: rename,
+ * link, unlink and changes to extended attributes. Each one releases the file's
+ * kernel delegations around the real operation, the do_*() function. Otherwise
+ * Ganesha would break its own delegation and block for up to
+ * fs.lease-break-time (see deleg.c).
+ */
+
+static fsal_status_t linkfile(struct fsal_obj_handle *obj_hdl,
+			      struct fsal_obj_handle *destdir_hdl,
+			      const char *name,
+			      struct fsal_attrlist *destdir_pre_attrs_out,
+			      struct fsal_attrlist *destdir_post_attrs_out)
+{
+	struct vfs_fsal_obj_handle *myself =
+		container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
+	fsal_status_t status;
+
+	vfs_deleg_suspend(myself);
+	status = do_linkfile(obj_hdl, destdir_hdl, name, destdir_pre_attrs_out,
+			     destdir_post_attrs_out);
+	vfs_deleg_resume(myself);
+
+	return status;
+}
+
+static fsal_status_t renamefile(struct fsal_obj_handle *obj_hdl,
+				struct fsal_obj_handle *olddir_hdl,
+				const char *old_name,
+				struct fsal_obj_handle *newdir_hdl,
+				const char *new_name,
+				struct fsal_attrlist *olddir_pre_attrs_out,
+				struct fsal_attrlist *olddir_post_attrs_out,
+				struct fsal_attrlist *newdir_pre_attrs_out,
+				struct fsal_attrlist *newdir_post_attrs_out)
+{
+	struct vfs_fsal_obj_handle *obj =
+		container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
+	struct vfs_fsal_obj_handle *newdir;
+	vfs_file_handle_t *dest_fh;
+	bool dest = false;
+	fsal_errors_t fsal_error = ERR_FSAL_NO_ERROR;
+	fsal_status_t status;
+	int fd;
+
+	vfs_alloc_handle(dest_fh);
+
+	vfs_deleg_suspend(obj);
+
+	/* If the rename replaces an existing file, that file is unlinked, which
+	 * breaks its delegations too. We only have its name, so look it up
+	 * among the delegated files. That needs an fd for the target directory,
+	 * and vfs_fsal_open() can only open directories on file systems that
+	 * this FSAL owns.
+	 */
+	if (newdir_hdl->fsal == newdir_hdl->fs->fsal) {
+		newdir = container_of(newdir_hdl, struct vfs_fsal_obj_handle,
+				      obj_handle);
+		fd = vfs_fsal_open(newdir, O_PATH | O_NOACCESS, &fsal_error);
+
+		if (fd >= 0) {
+			dest = vfs_deleg_suspend_name(fd, newdir_hdl->fs,
+						      new_name, dest_fh);
+			close(fd);
+		}
+	}
+
+	status = do_renamefile(obj_hdl, olddir_hdl, old_name, newdir_hdl,
+			       new_name, olddir_pre_attrs_out,
+			       olddir_post_attrs_out, newdir_pre_attrs_out,
+			       newdir_post_attrs_out);
+
+	/* By handle: the file the rename replaced may be gone by now */
+	if (dest)
+		vfs_deleg_resume_handle(dest_fh);
+	vfs_deleg_resume(obj);
+
+	return status;
+}
+
+static fsal_status_t file_unlink(struct fsal_obj_handle *dir_hdl,
+				 struct fsal_obj_handle *obj_hdl,
+				 const char *name,
+				 struct fsal_attrlist *parent_pre_attrs_out,
+				 struct fsal_attrlist *parent_post_attrs_out)
+{
+	struct vfs_fsal_obj_handle *obj = NULL;
+	fsal_status_t status;
+
+	/* obj_hdl can be NULL when the caller only has the name. A file without
+	 * a handle can't have delegations, so there is nothing to release.
+	 */
+	if (obj_hdl != NULL) {
+		obj = container_of(obj_hdl, struct vfs_fsal_obj_handle,
+				   obj_handle);
+		vfs_deleg_suspend(obj);
+	}
+
+	status = do_file_unlink(dir_hdl, obj_hdl, name, parent_pre_attrs_out,
+				parent_post_attrs_out);
+
+	if (obj != NULL)
+		vfs_deleg_resume(obj);
+
+	return status;
+}
+
+static fsal_status_t vfs_setxattrs(struct fsal_obj_handle *obj_hdl,
+				   setxattr_option4 option, xattrkey4 *xa_name,
+				   xattrvalue4 *xa_value)
+{
+	struct vfs_fsal_obj_handle *myself =
+		container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
+	fsal_status_t status;
+
+	vfs_deleg_suspend(myself);
+	status = do_vfs_setxattrs(obj_hdl, option, xa_name, xa_value);
+	vfs_deleg_resume(myself);
+
+	return status;
+}
+
+static fsal_status_t vfs_removexattrs(struct fsal_obj_handle *obj_hdl,
+				      xattrkey4 *xa_name)
+{
+	struct vfs_fsal_obj_handle *myself =
+		container_of(obj_hdl, struct vfs_fsal_obj_handle, obj_handle);
+	fsal_status_t status;
+
+	vfs_deleg_suspend(myself);
+	status = do_vfs_removexattrs(obj_hdl, xa_name);
+	vfs_deleg_resume(myself);
+
+	return status;
 }
 
 static fsal_status_t vfs_listxattrs(struct fsal_obj_handle *obj_hdl,
@@ -2076,6 +2214,7 @@ void vfs_handle_ops_init(struct fsal_obj_ops *ops)
 	ops->commit2 = vfs_commit2;
 #ifdef F_OFD_GETLK
 	ops->lock_op2 = vfs_lock_op2;
+	ops->lease_op2 = vfs_lease_op2;
 #endif
 	ops->setattr2 = vfs_setattr2;
 	ops->close2 = vfs_close2;

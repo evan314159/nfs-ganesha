@@ -28,6 +28,7 @@ SET(fsalvfs_LIB_SRCS_common
    ../handle.c
    ../handle_syscalls.c
    ../file.c
+   ../deleg.c
    ../xattrs.c
    ../namedattr.c
    ../vfs_methods.h

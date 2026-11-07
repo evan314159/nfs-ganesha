@@ -29,6 +29,7 @@ SET(fsalxfs_LIB_SRCS
    ../handle.c
    handle_syscalls.c
    ../file.c
+   ../deleg.c
    ../xattrs.c
    ../namedattr.c
    ../state.c

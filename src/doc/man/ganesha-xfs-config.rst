@@ -49,6 +49,13 @@ XFS {}
 FSAL_XFS doesn't support VFS's notify_local_changes: its file handles are
 not the kernel's, which fanotify reports.
 
+DELEGATIONS
+==========================================================
+
+On Linux 6.19 and later, FSAL_XFS can grant NFSv4 read and write delegations,
+as FSAL_VFS does: see DELEGATIONS in
+:doc:`ganesha-vfs-config <ganesha-vfs-config>`\(8).
+
 See also
 ==============================
 :doc:`ganesha-log-config <ganesha-log-config>`\(8)

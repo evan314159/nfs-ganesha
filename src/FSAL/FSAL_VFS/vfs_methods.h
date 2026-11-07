@@ -193,6 +193,10 @@ struct vfs_fsal_obj_handle {
 		struct {
 			struct fsal_share share;
 			struct vfs_fd fd;
+			/** This file's delegations (struct vfs_deleg) */
+			struct glist_head delegs;
+			/** Calls that have the kernel delegations released */
+			int32_t deleg_suspended;
 		} file;
 		struct {
 			unsigned char *link_content;
@@ -445,5 +449,22 @@ vfs_restore_ganesha_credentials(const struct fsal_module *fsal_module)
 fsal_status_t find_fd(struct fsal_fd **out_fd, struct fsal_obj_handle *obj_hdl,
 		      struct fsal_fd *tmp_fd, struct state_t *state,
 		      fsal_openflags_t openflags, bool bypass);
+
+/* Delegations, in deleg.c */
+bool vfs_deleg_supported(void);
+uint32_t vfs_fs_deleg_recall_limit(struct fsal_export *exp_hdl);
+fsal_status_t vfs_lease_op2(struct fsal_obj_handle *obj_hdl,
+			    struct state_t *state, void *owner,
+			    fsal_deleg_t deleg);
+void vfs_deleg_suspend(struct vfs_fsal_obj_handle *myself);
+void vfs_deleg_resume(struct vfs_fsal_obj_handle *myself);
+bool vfs_deleg_suspend_handle(const vfs_file_handle_t *fh);
+int vfs_deleg_dup_fd_handle(const vfs_file_handle_t *fh);
+void vfs_deleg_resume_handle(const vfs_file_handle_t *fh);
+bool vfs_deleg_suspend_name(int dirfd, struct fsal_filesystem *fs,
+			    const char *name, vfs_file_handle_t *fh);
+int vfs_deleg_dup_fd(struct vfs_fsal_obj_handle *myself,
+		     fsal_openflags_t openflags);
+void vfs_deleg_release(struct vfs_fsal_obj_handle *myself);
 
 #endif /* VFS_METHODS_H */
