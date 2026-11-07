@@ -61,7 +61,7 @@
  * earlier client ID makes nfs41_request_error_should_restart() wait for
  * recovery, in the recovery thread itself, and the mount hangs. The
  * delegation went away with that client ID (or with the earlier server
- * instance), so with macOS_quirk_return_stale_delegation we answer NFS4_OK.
+ * instance), so with macOS_quirk_stale_stateid we answer NFS4_OK.
  *
  * @todo Remove once macOS is fixed.
  *
@@ -96,7 +96,7 @@ static bool return_stale_delegation_quirk(compound_data_t *data,
 		return false;
 
 	return macos_quirk_applies(
-		nfs_param.nfsv4_param.macos_quirk_return_stale_delegation);
+		nfs_param.nfsv4_param.macos_quirk_stale_stateid);
 }
 #endif
 

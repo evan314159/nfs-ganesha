@@ -334,16 +334,13 @@ NFSV4 {}
 	macOS_quirk_retry_delay(bool, default false)
 		* macOS client workaround; see ganesha-core-config(8).
 
-	macOS_quirk_return_stale_delegation(bool, default false)
+	macOS_quirk_stale_stateid(bool, default false)
 		* macOS client workaround; see ganesha-core-config(8).
 
 	macOS_quirk_late_reclaim(bool, default false)
 		* macOS client workaround; see ganesha-core-config(8).
 
 	macOS_quirk_no_write_delegations(bool, default false)
-		* macOS client workaround; see ganesha-core-config(8).
-
-	macOS_quirk_refresh_stale_stateid(bool, default false)
 		* macOS client workaround; see ganesha-core-config(8).
 
 	Delegations(bool, default false)

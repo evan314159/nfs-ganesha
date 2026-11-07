@@ -732,10 +732,11 @@ typedef struct nfs_version4_parameter {
 	    Settable with macOS_quirk_retry_delay.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_retry_delay;
-	/** Answer NFS4_OK to DELEGRETURN of a delegation from an earlier
-	    server instance. Settable with macOS_quirk_return_stale_delegation.
+	/** Answer a stateid of an earlier client ID or server instance with
+	    NFS4_OK for DELEGRETURN, NFS4ERR_OLD_STATEID otherwise. Settable
+	    with macOS_quirk_stale_stateid.
 	    @todo Remove once macOS is fixed. */
-	bool macos_quirk_return_stale_delegation;
+	bool macos_quirk_stale_stateid;
 	/** Accept an NFSv4.1 reclaim in grace after the client's
 	    RECLAIM_COMPLETE. Settable with macOS_quirk_late_reclaim.
 	    @todo Remove once macOS is fixed. */
@@ -744,11 +745,6 @@ typedef struct nfs_version4_parameter {
 	    macOS_quirk_no_write_delegations.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_no_write_delegations;
-	/** Answer NFS4ERR_OLD_STATEID, not NFS4ERR_BAD_STATEID, to a stateid
-	    of an earlier server instance once the client has recovered.
-	    Settable with macOS_quirk_refresh_stale_stateid.
-	    @todo Remove once macOS is fixed. */
-	bool macos_quirk_refresh_stale_stateid;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */

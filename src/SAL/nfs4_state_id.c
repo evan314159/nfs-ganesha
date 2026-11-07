@@ -877,40 +877,65 @@ static nfsstat4 check_special_stateid(stateid4 *stateid, compound_data_t *data,
 }
 
 #ifdef USE_MACOS_QUIRKS
-#define MACOS_REFRESH_STALE_STATEID_DELAY_US 100000
+#define MACOS_STALE_STATEID_DELAY_US 100000
 
 /**
  * @brief Whether to answer NFS4ERR_OLD_STATEID to a stateid of an earlier
- *        server instance
+ *        client ID or server instance
  *
- * A macOS request in flight across a server restart is answered
- * NFS4ERR_BAD_STATEID. nfs41_request_error_should_restart() waits for
- * recovery and then resends the request with a new RPC header only
+ * When macOS recovers its state under a new client ID (after a server
+ * restart, a lease expiry or a revoke), a request it had in flight is
+ * answered NFS4ERR_BAD_STATEID. nfs41_request_error_should_restart() waits
+ * for recovery and then resends the request with a new RPC header only
  * (nfs_request_async_finish(), nfs_request2()), so the compound still
- * carries the dead stateid, and every resend starts recovery again: the
- * mount loops through recovery for good, though recovery itself reclaimed
- * everything. NFS4ERR_OLD_STATEID is the one stateid error that layer hands
- * back to its caller, and the callers (nfs_buf_write_rpc_finish(),
- * nfs_buf_read_rpc_finish(), nfs_vnop_close() and so on) then rebuild the
- * request, which takes the current stateid from nfs_get_stateid(). Before
- * the client has recovered, NFS4ERR_BAD_STATEID is still what starts its
- * recovery, so with macOS_quirk_refresh_stale_stateid we answer
- * NFS4ERR_OLD_STATEID only once it has (cid_recovered).
+ * carries the dead stateid, every resend starts recovery again, and the
+ * mount loops through recovery though recovery reclaimed everything.
+ * NFS4ERR_OLD_STATEID is the stateid error that layer hands back to its
+ * caller, and the callers (nfs_buf_write_rpc_finish(),
+ * nfs_buf_read_rpc_finish(), nfs_vnop_close() and so on) wait for any
+ * recovery and then rebuild the request, which takes the current stateid
+ * from nfs_get_stateid().
+ *
+ * A stateid of an earlier client ID of this server instance only arrives
+ * once macOS has made the new client ID, which it does in nfs_recover(), so
+ * it gets NFS4ERR_OLD_STATEID at once. After a server restart, macOS makes
+ * its new client ID when it reconnects, before any recovery, and only
+ * NFS4ERR_BAD_STATEID starts that, so a stateid of an earlier server
+ * instance gets NFS4ERR_OLD_STATEID only once the client has recovered
+ * (cid_recovered).
  *
  * @todo Remove once macOS is fixed.
  *
- * @param[in] data  Compound data
+ * @param[in] data              Compound data
+ * @param[in] earlier_instance  The stateid is from an earlier server
+ *                              instance
  *
  * @return true to answer NFS4ERR_OLD_STATEID.
  */
-static bool refresh_stale_stateid_quirk(compound_data_t *data)
+static bool stale_stateid_quirk(compound_data_t *data, bool earlier_instance)
 {
-	if (data->session == NULL || data->session->clientid_record == NULL ||
-	    !data->session->clientid_record->cid_recovered)
+	if (data->minorversion == 0 || data->session == NULL ||
+	    data->session->clientid_record == NULL)
+		return false;
+
+	if (earlier_instance && !data->session->clientid_record->cid_recovered)
 		return false;
 
 	return macos_quirk_applies(
-		nfs_param.nfsv4_param.macos_quirk_refresh_stale_stateid);
+		nfs_param.nfsv4_param.macos_quirk_stale_stateid);
+}
+
+/* Answer NFS4ERR_OLD_STATEID for stale_stateid_quirk(). macOS resends at
+ * once, and a stateid it can't refresh (a delegation whose reclaim failed)
+ * would come back in a tight loop, so pace it.
+ */
+static nfsstat4 stale_stateid_old(const char *tag, const char *what)
+{
+	LogInfo(COMPONENT_STATE,
+		"Check %s stateid of %s, answering NFS4ERR_OLD_STATEID (macOS_quirk_stale_stateid)",
+		tag, what);
+	usleep(MACOS_STALE_STATEID_DELAY_US);
+	return NFS4ERR_OLD_STATEID;
 }
 #endif
 
@@ -949,17 +974,9 @@ static nfsstat4 check_stateid_server_instance(
 		if (data->minorversion == 0)
 			return NFS4ERR_STALE_STATEID;
 #ifdef USE_MACOS_QUIRKS
-		if (refresh_stale_stateid_quirk(data)) {
-			LogInfo(COMPONENT_STATE,
-				"Check %s stateid of an earlier server instance after the client's recovery, answering NFS4ERR_OLD_STATEID (macOS_quirk_refresh_stale_stateid)",
-				tag);
-			/* macOS resends at once. A stateid it can't refresh
-			 * (a delegation whose reclaim failed) would come back
-			 * in a tight loop, so pace it.
-			 */
-			usleep(MACOS_REFRESH_STALE_STATEID_DELAY_US);
-			return NFS4ERR_OLD_STATEID;
-		}
+		if (stale_stateid_quirk(data, true))
+			return stale_stateid_old(tag,
+						 "an earlier server instance");
 #endif
 		return NFS4ERR_BAD_STATEID;
 	}
@@ -1043,6 +1060,14 @@ nfsstat4 nfs4_check_stateid_acquire_state_lock(
 					       str_valid, str, tag, &clientid);
 	if (status != NFS4_OK)
 		goto failure;
+
+#ifdef USE_MACOS_QUIRKS
+	if (data->session != NULL && clientid != data->session->clientid &&
+	    stale_stateid_quirk(data, false)) {
+		status = stale_stateid_old(tag, "an earlier client ID");
+		goto failure;
+	}
+#endif
 
 	/* Try to get the related state */
 	state2 = nfs4_State_Get_Pointer(stateid->other);
