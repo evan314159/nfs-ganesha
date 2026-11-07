@@ -635,7 +635,11 @@ macOS_quirk_late_reclaim(bool, default false)
     a deny-mode open. When set, an NFSv4.1 OPEN with CLAIM_PREVIOUS is
     accepted after the client's RECLAIM_COMPLETE, as long as the server is
     still in its grace period and the client was in the recovery records.
-    Lock reclaims are already accepted in that case. Follows
+    Lock reclaims are already accepted in that case. That early
+    RECLAIM_COMPLETE is also not counted toward ending grace early; the one
+    macOS sends after it has reclaimed is. (Otherwise grace ends seconds
+    after the restart, and a macOS mount whose delegation reclaim then fails
+    keeps using the dead delegation and loops through recovery.) Follows
     macOS_quirks_only_for_macOS_clients.
 
 macOS_quirk_no_write_delegations(bool, default false)
