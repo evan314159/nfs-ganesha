@@ -218,6 +218,13 @@ enum nfs_req_result nfs4_op_setxattr(struct nfs_argop4 *op,
 		return NFS_REQ_ERROR;
 	}
 
+	/* A client with a delegation may be caching the file's xattrs */
+	if (state_deleg_conflict(obj_handle, true)) {
+		res_SETXATTR4->status = NFS4ERR_DELAY;
+		nfs_put_grace_status();
+		return NFS_REQ_ERROR;
+	}
+
 	res_SETXATTR4->SETXATTR4res_u.resok4.sxr_info.atomic = false;
 	res_SETXATTR4->SETXATTR4res_u.resok4.sxr_info.before =
 		fsal_get_changeid4(data->current_obj);
@@ -424,6 +431,13 @@ enum nfs_req_result nfs4_op_removexattr(struct nfs_argop4 *op,
 	 */
 	if (!nfs_get_grace_status(false)) {
 		res_REMOVEXATTR4->status = NFS4ERR_GRACE;
+		return NFS_REQ_ERROR;
+	}
+
+	/* A client with a delegation may be caching the file's xattrs */
+	if (state_deleg_conflict(obj_handle, true)) {
+		res_REMOVEXATTR4->status = NFS4ERR_DELAY;
+		nfs_put_grace_status();
 		return NFS_REQ_ERROR;
 	}
 
