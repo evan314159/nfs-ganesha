@@ -652,6 +652,18 @@ macOS_quirk_no_write_delegations(bool, default false)
     still get read delegations, under which macOS sends its locks to the
     server. Follows macOS_quirks_only_for_macOS_clients.
 
+macOS_quirk_refresh_stale_stateid(bool, default false)
+    Works around a macOS bug: when a server restart catches a request in
+    flight, macOS recovers its state, but then resends the request
+    unchanged, still carrying the stateid of the earlier server instance.
+    NFS4ERR_BAD_STATEID makes it recover again and resend it again, so the
+    mount loops through recovery and the application's I/O never
+    completes. When set, once the client has finished recovering (it sent
+    a second RECLAIM_COMPLETE), such a stateid gets NFS4ERR_OLD_STATEID
+    instead, which makes macOS rebuild the request with its current
+    stateid. Before that, NFS4ERR_BAD_STATEID still starts its recovery.
+    Follows macOS_quirks_only_for_macOS_clients.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 

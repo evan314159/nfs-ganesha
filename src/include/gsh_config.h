@@ -744,6 +744,11 @@ typedef struct nfs_version4_parameter {
 	    macOS_quirk_no_write_delegations.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_no_write_delegations;
+	/** Answer NFS4ERR_OLD_STATEID, not NFS4ERR_BAD_STATEID, to a stateid
+	    of an earlier server instance once the client has recovered.
+	    Settable with macOS_quirk_refresh_stale_stateid.
+	    @todo Remove once macOS is fixed. */
+	bool macos_quirk_refresh_stale_stateid;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */

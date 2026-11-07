@@ -794,6 +794,9 @@ struct nfs_client_id_t {
 						 yet counted toward lifting
 						 grace
 						 (macOS_quirk_late_reclaim) */
+	bool cid_recovered; /*< The client has sent a RECLAIM_COMPLETE after
+			       its first, so nfs_recover() has finished
+			       (macOS_quirk_refresh_stale_stateid) */
 #endif
 
 	uint32_t curr_deleg_grants; /* current num of delegations owned by

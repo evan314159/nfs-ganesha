@@ -82,7 +82,7 @@ static bool return_stale_delegation_quirk(compound_data_t *data,
 		return false;
 
 	if (status != NFS4ERR_BAD_STATEID && status != NFS4ERR_STALE_STATEID &&
-	    status != NFS4ERR_EXPIRED)
+	    status != NFS4ERR_EXPIRED && status != NFS4ERR_OLD_STATEID)
 		return false;
 
 	memcpy(&clientid, stateid->other, sizeof(clientid));

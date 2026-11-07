@@ -961,6 +961,10 @@ static struct config_item version4_params[] = {
 	CONF_ITEM_BOOL("macOS_quirk_no_write_delegations", false,
 		       nfs_version4_parameter,
 		       macos_quirk_no_write_delegations),
+	/* @todo Remove once macOS is fixed. */
+	CONF_ITEM_BOOL("macOS_quirk_refresh_stale_stateid", false,
+		       nfs_version4_parameter,
+		       macos_quirk_refresh_stale_stateid),
 #endif
 	CONF_ITEM_BOOL("Delegations", false, nfs_version4_parameter,
 		       allow_delegations),
