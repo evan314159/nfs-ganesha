@@ -728,6 +728,10 @@ typedef struct nfs_version4_parameter {
 	    Settable with macOS_quirk_retry_delay.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_retry_delay;
+	/** Accept an NFSv4.1 reclaim in grace after the client's
+	    RECLAIM_COMPLETE. Settable with macOS_quirk_late_reclaim.
+	    @todo Remove once macOS is fixed. */
+	bool macos_quirk_late_reclaim;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */
