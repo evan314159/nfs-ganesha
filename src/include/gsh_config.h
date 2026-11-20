@@ -732,6 +732,10 @@ typedef struct nfs_version4_parameter {
 	    RECLAIM_COMPLETE. Settable with macOS_quirk_late_reclaim.
 	    @todo Remove once macOS is fixed. */
 	bool macos_quirk_late_reclaim;
+	/** Accept FREE_STATEID of the anonymous (all-zero) stateid.
+	    Settable with macOS_quirk_free_anonymous_stateid.
+	    @todo Remove once macOS is fixed. */
+	bool macos_quirk_free_anonymous_stateid;
 #endif
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */

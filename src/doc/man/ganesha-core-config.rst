@@ -621,6 +621,17 @@ macOS_quirk_late_reclaim(bool, default false)
     keeps using the dead delegation and loops through recovery.) Follows
     macOS_quirks_only_for_macOS_clients.
 
+macOS_quirk_free_anonymous_stateid(bool, default false)
+    Works around a macOS bug: when a lock owner's first LOCK fails (for
+    example NFS4ERR_OPENMODE, when flock() or O_EXLOCK asks for an exclusive
+    lock on a file opened read-only, as Microsoft Word does), the owner never
+    gets a stateid, yet when the file is closed macOS still sends
+    FREE_STATEID for it with the anonymous (all-zero) stateid. The
+    NFS4ERR_BAD_STATEID reply sends macOS into state recovery, which waits on
+    the close still in progress, so the mount hangs. When set, FREE_STATEID
+    of the anonymous stateid succeeds, since it frees nothing. Follows
+    macOS_quirks_only_for_macOS_clients.
+
 Delegations(bool, default false)
     Whether to allow delegations.
 
