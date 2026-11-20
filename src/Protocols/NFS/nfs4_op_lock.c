@@ -127,6 +127,37 @@ static state_status_t nfsv4_granted_callback(struct fsal_obj_handle *obj,
 	return STATE_SUCCESS;
 }
 
+/**
+ * @brief Whether to grant a WRITE lock on a read-only open
+ *
+ * A WRITE lock is an exclusive lock: it stops other owners from locking the
+ * range, but does not let the client write. Writes through a read-only open
+ * are still refused. NFS clients send an exclusive flock() or O_EXLOCK as a
+ * WRITE lock on the whole file, on whatever open the program has, and macOS
+ * allows those on a file opened read-only. RFC 8881 18.10.4 leaves it to the
+ * server whether to grant them.
+ *
+ * Linux only lets a process hold an exclusive lock on a file it has opened
+ * for writing. To hold the lock, FSAL_VFS opens the file a second time,
+ * read/write, separately from the client's read-only open. That second open
+ * only succeeds if the user has permission to write the file, so with
+ * Allow_Write_Lock_On_Read_Open, grant the lock only if the user has that
+ * permission. CEPH, GPFS, SaunaFS and LizardFS open the file the same way.
+ * FSAL_GLUSTER uses the client's read-only open, so Gluster may still refuse
+ * the lock.
+ *
+ * @param[in] obj  The file to be locked
+ *
+ * @return true to grant the WRITE lock.
+ */
+static bool write_lock_on_read_open_allowed(struct fsal_obj_handle *obj)
+{
+	if (!nfs_param.nfsv4_param.allow_write_lock_on_read_open)
+		return false;
+
+	return FSAL_IS_SUCCESS(fsal_access(obj, FSAL_WRITE_ACCESS));
+}
+
 enum nfs_req_result nfs4_op_lock(struct nfs_argop4 *op, compound_data_t *data,
 				 struct nfs_resop4 *resp)
 {
@@ -547,6 +578,9 @@ check_seqid:
 	}
 
 	/* Check if open state has correct access for type of lock.
+	 * With Allow_Write_Lock_On_Read_Open, a WRITE lock on a read-only
+	 * open is granted if the user has write permission on the file (see
+	 * write_lock_on_read_open_allowed()).
 	 *
 	 * Don't need to check for conflicting states since this open
 	 * state assures there are no conflicting states.
@@ -554,7 +588,8 @@ check_seqid:
 	if (((arg_LOCK4->locktype == WRITE_LT ||
 	      arg_LOCK4->locktype == WRITEW_LT) &&
 	     ((state_open->state_data.share.share_access &
-	       OPEN4_SHARE_ACCESS_WRITE) == 0)) ||
+	       OPEN4_SHARE_ACCESS_WRITE) == 0) &&
+	     !write_lock_on_read_open_allowed(obj)) ||
 	    ((arg_LOCK4->locktype == READ_LT ||
 	      arg_LOCK4->locktype == READW_LT) &&
 	     ((state_open->state_data.share.share_access &

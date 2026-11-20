@@ -635,6 +635,35 @@ macOS_quirk_free_anonymous_stateid(bool, default false)
 Delegations(bool, default false)
     Whether to allow delegations.
 
+Allow_Write_Lock_On_Read_Open(bool, default false)
+    Lets a client take an exclusive lock on a file it has opened read-only.
+
+    An exclusive lock (a "write lock" in NFS) only stops others from locking
+    the file. It does not let the client write: writes through a read-only
+    open are still refused.
+
+    NFS clients turn flock() into a lock on the whole file, so an exclusive
+    flock() becomes a write lock. macOS allows an exclusive flock() on a file
+    opened read-only, and Microsoft Word for Mac relies on that: when the
+    lock is refused, it opens the document read-only.
+
+    By default Ganesha refuses the lock, as POSIX does for fcntl() locks.
+    When this option is set, Ganesha grants the lock if the user has
+    permission to write the file.
+
+    The permission check is needed because Linux only lets a program hold an
+    exclusive lock on a file it has opened for writing. To hold the lock,
+    Ganesha opens the file a second time, read-write, separately from the
+    client's read-only open. That second open only succeeds if the user has
+    permission to write the file.
+
+    The VFS, CEPH, GPFS, SaunaFS and LizardFS FSALs open the file this way.
+    FSAL_GLUSTER does not: it uses the client's read-only open, so Gluster
+    may still refuse the lock.
+
+    RFC 8881 (section 18.10.4) leaves it to the server whether to grant
+    this lock.
+
 Deleg_Recall_Retry_Delay(uint32_t, range 0 to 10, default 1)
     Delay after which server will retry a recall in case of failures
 

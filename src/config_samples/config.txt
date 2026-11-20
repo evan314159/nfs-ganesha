@@ -339,6 +339,8 @@ NFSV4 {}
 
 	Delegations(bool, default false)
 
+	Allow_Write_Lock_On_Read_Open(bool, default false)
+
 	Deleg_Recall_Retry_Delay(uint32_t, range 0 to 10, default 1)
 
 	Preserve_Unlinked(bool, default false)

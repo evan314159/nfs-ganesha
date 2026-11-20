@@ -740,6 +740,10 @@ typedef struct nfs_version4_parameter {
 	/** Whether to allow delegations. Defaults to false and settable
 	    with Delegations */
 	bool allow_delegations;
+	/** Whether to grant a WRITE (exclusive) lock on a read-only open,
+	    if the user has write permission on the file. Defaults to false
+	    and settable with Allow_Write_Lock_On_Read_Open. */
+	bool allow_write_lock_on_read_open;
 	/** Delay after which server will retry a recall in case of failures */
 	uint32_t deleg_recall_retry_delay;
 	/** support for OPEN4_RESULT_PRESERVE_UNLINKED */

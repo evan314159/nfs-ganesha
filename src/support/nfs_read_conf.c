@@ -1006,6 +1006,8 @@ static struct config_item version4_params[] = {
 #endif
 	CONF_ITEM_BOOL("Delegations", false, nfs_version4_parameter,
 		       allow_delegations),
+	CONF_ITEM_BOOL("Allow_Write_Lock_On_Read_Open", false,
+		       nfs_version4_parameter, allow_write_lock_on_read_open),
 	CONF_ITEM_UI32("Deleg_Recall_Retry_Delay", 0, 10,
 		       DELEG_RECALL_RETRY_DELAY_DEFAULT, nfs_version4_parameter,
 		       deleg_recall_retry_delay),
